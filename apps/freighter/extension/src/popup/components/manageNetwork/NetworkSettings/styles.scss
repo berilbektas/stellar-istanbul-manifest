@@ -1,0 +1,49 @@
+@use "../../../styles/utils.scss" as *;
+
+$activeColor: rgba(61, 204, 152, 1);
+
+.NetworkSettings {
+  &__header {
+    color: var(--sds-clr-gray-11);
+    font-size: pxToRem(14px);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: pxToRem(16px);
+    margin-top: pxToRem(32px);
+  }
+
+  &__name {
+    align-items: center;
+    display: flex;
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-medium);
+
+    &--active {
+      color: $activeColor;
+    }
+  }
+
+  &__active-marker {
+    border: 1px solid $activeColor;
+    border-radius: 2rem;
+    height: pxToRem(16px);
+    margin-left: pxToRem(-1px);
+    position: absolute;
+    width: pxToRem(16px);
+  }
+
+  &__url {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.875rem;
+    margin-left: 1rem;
+  }
+
+  &__bottom {
+    padding: 1.5rem 0;
+  }
+
+  .ListNavLink__wrapper {
+    border-radius: pxToRem(16px);
+    background-color: var(--sds-clr-gray-02);
+    padding: pxToRem(16px);
+  }
+}

@@ -1,0 +1,26 @@
+flowchart TD
+  agent["AI Agent (Claude)"]
+  wmcp["Wallet MCP\nstdio · NO key"]
+  tmcp["Twitter MCP\nremote · Streamable HTTP"]
+  transporter["Transporter\nrelay + pairing + attestation\n(AWS AMD SEV-SNP VM)"]
+  freighter["Forked Freighter\nPRIVATE KEY + approval UI"]
+  backend["Twitter backend\nx402 merchant"]
+  facilitator["x402 Facilitator"]
+  stellar["Stellar testnet\nSoroban RPC"]
+
+  agent --> wmcp
+  agent --> tmcp
+  tmcp -->|"timeline=free · tweet=402"| backend
+  wmcp -->|"3 sign-request (Bearer JWT)"| transporter
+  transporter -->|"4 WS push"| freighter
+  freighter -->|"6 sign-result"| transporter
+  transporter -->|"7 poll result"| wmcp
+  wmcp -->|"7 PAYMENT-SIGNATURE retry"| backend
+  backend -->|"8 verify + settle"| facilitator
+  facilitator -->|"9 USDC settle"| stellar
+  backend -->|"10 PAYMENT-RESPONSE"| wmcp
+
+  classDef ours fill:#cfe3ff,stroke:#3b82f6,color:#0b2545;
+  classDef ext fill:#eeeeee,stroke:#999999,color:#333333;
+  class wmcp,tmcp,transporter,freighter,backend ours;
+  class facilitator,stellar ext;

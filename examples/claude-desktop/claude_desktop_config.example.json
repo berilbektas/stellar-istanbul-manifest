@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "wallet": {
+      "command": "node",
+      "args": ["/ABSOLUTE/PATH/to/wallet-mcp/apps/wallet-mcp/dist/index.js"],
+      "env": {
+        "TRANSPORTER_URL": "http://localhost:8787",
+        "STELLAR_NETWORK": "stellar:testnet",
+        "SOROBAN_RPC_URL": "https://soroban-testnet.stellar.org"
+      }
+    },
+    "twitter": {
+      "type": "streamable-http",
+      "url": "http://localhost:4022/mcp"
+    }
+  }
+}

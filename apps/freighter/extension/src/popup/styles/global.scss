@@ -1,0 +1,131 @@
+:root {
+  --z-index--banner: 10;
+  --z-index--loader: -1;
+  --z-index--scam-warning: 20;
+  --z-index--ledger: 30;
+
+  // popup dimensions
+  --popup--width: 360px;
+  --popup--height: 600px;
+  --popup--side-padding: 1.5rem;
+  --popup-vertical-padding: 1.5rem;
+
+  --header--height: 119px;
+  --bottom-nav--height: 72px;
+  --subview--header--height: 48px;
+
+  --fullscreen--max-width: 1100px;
+
+  --back--button-dimension: 1.5rem;
+  --back--button-z-index: 2;
+
+  --dropdown-animation: 0.3s ease-out;
+
+  --color-shadow-rgb: 0, 0, 0;
+
+  --z-index-tooltip: 20;
+  --z-index-modal: 30;
+  --z-index-maintenance-screen: 100;
+}
+
+html,
+body {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+body {
+  color: var(--sds-clr-gray-12);
+  overscroll-behavior: none;
+  margin: 0;
+  padding: 0;
+}
+
+a {
+  text-decoration: none;
+}
+
+#root {
+  position: relative;
+  height: 100%;
+  // TODO: update in SDS?
+  min-height: auto !important;
+  min-width: auto !important;
+  display: block !important;
+
+  // TODO: fix in SDS
+  ul {
+    padding-left: 0;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    margin-top: 0;
+    margin-bottom: 0;
+  }
+}
+
+// Form layout
+.FormLayoutView {
+  height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+
+  .FormRows {
+    height: 100%;
+  }
+
+  .SubmitButtonWrapper {
+    margin-top: auto;
+  }
+}
+
+// TODO: fix in SDS
+.Notification {
+  border-radius: 0.5rem;
+}
+
+// TODO: Update in SDS
+.Tooltip__content__container {
+  padding: 0.5rem !important;
+}
+.Tooltip__component {
+  svg {
+    width: 0.9rem !important;
+    height: 0.9rem !important;
+  }
+  .IconButton--default {
+    margin-left: 0;
+  }
+}
+
+.RouterLoading {
+  .View__content {
+    height: 100vh;
+  }
+}
+
+.Loader * {
+  cursor: none;
+  pointer-events: none;
+  user-select: none;
+}
+
+// TODO: fix in SDS
+.sds-theme-light p,
+.sds-theme-light ul,
+.sds-theme-light ol,
+.sds-theme-dark p,
+.sds-theme-dark ul,
+.sds-theme-dark ol {
+  color: inherit !important;
+}

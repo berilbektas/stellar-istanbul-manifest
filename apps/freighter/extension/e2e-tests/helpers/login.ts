@@ -1,0 +1,172 @@
+import StellarHDWallet from "stellar-hd-wallet";
+import { Page, BrowserContext } from "@playwright/test";
+import { expect } from "../test-fixtures";
+import { stubAllExternalApis } from "./stubs";
+
+const { generateMnemonic } = StellarHDWallet;
+
+export const PASSWORD = "My-password123";
+
+/**
+ * Creates a new wallet and logs into the extension on Test Net.
+ */
+export const login = async ({
+  page,
+  extensionId,
+}: {
+  page: Page;
+  extensionId: string;
+}) => {
+  await page.goto(`chrome-extension://${extensionId}/index.html`);
+  await page.getByText("I already have a wallet").click();
+
+  await expect(page.getByText("Create a Password")).toBeVisible();
+
+  await page.locator("#new-password-input").fill("My-password123");
+  await page.locator("#confirm-password-input").fill("My-password123");
+  await page.locator("#termsOfUse-input").check({ force: true });
+  await page.getByText("Confirm").click();
+
+  await expect(
+    page.getByText("Import wallet from recovery phrase"),
+  ).toBeVisible();
+  await expect(
+    page.getByText("You can also paste the phrase in the first box."),
+  ).toBeVisible();
+
+  const TEST_WORDS = generateMnemonic({ entropyBits: 128 }).split(" ");
+
+  for (let i = 1; i <= TEST_WORDS.length; i++) {
+    await page.locator(`#MnemonicPhrase-${i}`).fill(TEST_WORDS[i - 1]);
+  }
+
+  await page.getByRole("button", { name: "Import" }).click();
+
+  await expect(page.getByText("You’re all set!")).toBeVisible({
+    timeout: 20000,
+  });
+
+  await page.goto(`chrome-extension://${extensionId}/index.html#/`);
+  await expect(page.getByTestId("network-selector-open")).toBeVisible({
+    timeout: 10000,
+  });
+  await page.getByTestId("network-selector-open").click();
+  await page.getByText("Test Net").click();
+
+  // Wait for account-balances API call with TESTNET network param before clicking
+  const balancesPromise = page.waitForResponse(
+    (response) =>
+      response.url().includes("/account-balances/") &&
+      response.url().includes("network=TESTNET"),
+  );
+
+  // Wait for the balances API call to complete
+  await balancesPromise;
+
+  await expect(page.getByTestId("account-view")).toBeVisible({
+    timeout: 10000,
+  });
+};
+
+/**
+ * Logs in using `login()` and funds the account via Friendbot.
+ */
+export const loginAndFund = async ({
+  page,
+  extensionId,
+}: {
+  page: Page;
+  extensionId: string;
+}) => {
+  await login({ page, extensionId });
+
+  await expect(page.getByTestId("not-funded")).toBeVisible({
+    timeout: 10000,
+  });
+
+  await page.getByRole("button", { name: "Fund with Friendbot" }).click();
+
+  await expect(page.getByTestId("account-assets")).toBeVisible({
+    timeout: 30000,
+  });
+};
+
+/**
+ * Logs into a deterministic test account, optionally stubbing external APIs.
+ *
+ * @param stubOverrides - Optional function to add custom stub routes after `stubAllExternalApis` runs.
+ * @param isIntegrationMode - Set true to skip all stubbing for integration tests.
+ */
+export const loginToTestAccount = async ({
+  page,
+  extensionId,
+  context,
+  stubOverrides,
+  isIntegrationMode = false,
+}: {
+  page: Page;
+  extensionId: string;
+  context: BrowserContext;
+  stubOverrides?: () => Promise<void>;
+  isIntegrationMode?: boolean;
+}) => {
+  await page.goto(`chrome-extension://${extensionId}/index.html`);
+  if (context && !isIntegrationMode) {
+    // Wait for any background activity to complete
+    await stubAllExternalApis(page, context);
+    if (stubOverrides) {
+      await stubOverrides();
+    }
+  }
+  await page.getByText("I already have a wallet").click();
+
+  await page.locator("#new-password-input").fill("My-password123");
+  await page.locator("#confirm-password-input").fill("My-password123");
+  await page.locator("#termsOfUse-input").check({ force: true });
+  await page.getByText("Confirm").click();
+
+  // GDF32CQINROD3E2LMCGZUDVMWTXCJFR5SBYVRJ7WAAIAS3P7DCVWZEFY
+
+  const TEST_ACCOUNT_WORDS = [
+    "card",
+    "whip",
+    "erosion",
+    "fatal",
+    "reunion",
+    "foil",
+    "doctor",
+    "embark",
+    "plug",
+    "note",
+    "thank",
+    "company",
+  ];
+
+  for (let i = 1; i <= TEST_ACCOUNT_WORDS.length; i++) {
+    await page.locator(`#MnemonicPhrase-${i}`).fill(TEST_ACCOUNT_WORDS[i - 1]);
+  }
+
+  await page.getByRole("button", { name: "Import" }).click();
+  await expect(page.getByText("You’re all set!")).toBeVisible({
+    timeout: 20000,
+  });
+
+  await page.goto(`chrome-extension://${extensionId}/index.html#/`);
+  await expect(page.getByTestId("network-selector-open")).toBeVisible({
+    timeout: 50000,
+  });
+  await page.getByTestId("network-selector-open").click();
+  await page.getByText("Test Net").click();
+  await expect(page.getByTestId("account-view")).toBeVisible({
+    timeout: 30000,
+  });
+};
+
+export const switchToMainnet = async (page: Page) => {
+  await page.getByTestId("network-selector-open").click();
+  await page.getByText("Main Net").click();
+  await expect(page.getByTestId("network-selector-open")).toContainText(
+    "Main Net",
+    { timeout: 30000 },
+  );
+};

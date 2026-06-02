@@ -1,0 +1,49 @@
+@use "../../styles/utils.scss" as *;
+
+.ListNavLink {
+  align-items: center;
+  line-height: 1.5rem;
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+
+  &:not(:last-child) {
+    margin-bottom: pxToRem(16px);
+    padding-bottom: pxToRem(16px);
+    border-bottom: 1px solid var(--sds-clr-gray-06);
+  }
+
+  a,
+  span {
+    align-items: center;
+    color: var(--sds-clr-gray-12);
+    cursor: pointer;
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  &__wrapper {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__icon {
+    display: flex;
+    align-items: center;
+    width: pxToRem(24px);
+    height: pxToRem(24px);
+
+    svg {
+      width: pxToRem(24px);
+      height: pxToRem(24px);
+      color: var(--sds-clr-gray-09);
+    }
+  }
+
+  &__arrow {
+    height: pxToRem(24px);
+    width: pxToRem(24px);
+    stroke: var(--sds-clr-gray-09);
+  }
+}

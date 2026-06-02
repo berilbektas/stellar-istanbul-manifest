@@ -1,0 +1,68 @@
+# dependencies
+node_modules
+.pnp
+.pnp.js
+
+# bun
+bun.lockb
+
+# yarn (root uses Bun; apps/freighter uses its own Yarn)
+yarn.lock
+.yarn
+
+# testing
+coverage
+*.lcov
+.nyc_output
+test-results/
+playwright-report/
+
+# build artifacts
+dist
+build
+out
+*.tsbuildinfo
+
+# misc
+.DS_Store
+*.pem
+.env
+.env*.local
+.env.production
+
+# debug logs
+npm-debug.log*
+yarn-debug.log*
+bun-debug.log*
+*.log
+
+# typescript
+*.tsbuildinfo
+
+# IDE
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# turbo / cache
+.turbo
+.cache
+.eslintcache
+
+# wallet-mcp local credentials (NEVER commit) — see manifest §5
+.wallet-mcp/
+creds.json
+
+# TEE / attestation local artifacts — see manifest §18
+report.bin
+request-file.txt
+*.vlek
+*-cert-chain.pem

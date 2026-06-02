@@ -1,0 +1,31 @@
+.LoadingBackground {
+  opacity: 0;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: -1;
+  transition: all var(--dropdown-animation);
+  transition-delay: 0.1s;
+
+  &--active {
+    background-color: rgba(var(--color-shadow-rgb), 0.6);
+    opacity: 1;
+    z-index: 1;
+  }
+  &--isOpaque {
+    background-color: rgba(var(--color-shadow-rgb), 1);
+    height: 100vh;
+    width: 100vw;
+  }
+  &--isClear {
+    background: none;
+    height: 100vh;
+    width: 100vw;
+  }
+  &--isFullScreen {
+    height: 100vh;
+    width: 100vw;
+  }
+}

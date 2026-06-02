@@ -1,0 +1,75 @@
+@use "../../styles/utils.scss" as *;
+
+.ModalInfo {
+  &--connection-request {
+    display: flex;
+    justify-content: center;
+    margin-bottom: pxToRem(14px);
+
+    &__scan-label {
+      margin-bottom: pxToRem(14px);
+    }
+
+    &-scan-label {
+      margin-bottom: pxToRem(16px);
+    }
+  }
+
+  &--subject {
+    font-size: pxToRem(16px);
+    text-align: center;
+    color: var(--sds-clr-gray-11);
+    background-color: var(--sds-clr-gray-03);
+    border-radius: pxToRem(16px);
+    line-height: pxToRem(24px);
+    margin-bottom: 1.5rem;
+    padding: pxToRem(12px) pxToRem(16px);
+  }
+
+  &--connection-request-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: pxToRem(12px);
+    gap: 0.5rem;
+    padding: 2px 8px;
+    background-color: var(--sds-clr-lilac-02);
+    color: var(--sds-clr-lilac-11);
+    border: 1px solid var(--sds-clr-lilac-06);
+    border-radius: 100px;
+
+    p {
+      font-size: pxToRem(12px);
+      font-weight: 600;
+      line-height: pxToRem(20px);
+    }
+  }
+
+  &__icon {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 0.5rem;
+  }
+
+  &__asset {
+    align-items: center;
+    color: var(--color-red-70);
+    display: flex;
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-semi-bold);
+    justify-content: center;
+    line-height: 1.25rem;
+    text-align: center;
+  }
+
+  &__domain {
+    align-items: center;
+    color: var(--color-gray-70);
+    display: flex;
+    font-size: 0.75rem;
+    justify-content: center;
+    line-height: 1.125rem;
+    margin-bottom: 0.5rem;
+  }
+}

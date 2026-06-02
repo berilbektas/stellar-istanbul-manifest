@@ -1,0 +1,31 @@
+{
+  "$schema": "https://turborepo.dev/schema.json",
+  "tasks": {
+    "dev": {
+      "dependsOn": ["^build"],
+      "cache": false,
+      "persistent": true
+    },
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "build:fast": {
+      "dependsOn": ["^build:fast"],
+      "outputs": ["dist/**"]
+    },
+    "declarations": {
+      "dependsOn": ["build"],
+      "outputs": ["dist/**/*.d.ts", "dist/**/*.d.ts.map"]
+    },
+    "typecheck": {},
+    "lint": {},
+    "test": {
+      "dependsOn": ["^build"]
+    },
+    "format": {},
+    "clean": {
+      "cache": false
+    }
+  }
+}

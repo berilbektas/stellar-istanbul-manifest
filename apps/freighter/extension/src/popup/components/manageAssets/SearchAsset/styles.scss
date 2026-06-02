@@ -1,0 +1,29 @@
+:root {
+  --SearchAsset--loader--dimension: 1rem;
+}
+
+.SearchAsset {
+  &__InfoBlock {
+    padding-bottom: 1.625rem;
+    a {
+      color: var(--color-white);
+      text-decoration: underline;
+    }
+  }
+
+  &__copy {
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    margin-top: 2.875rem;
+    text-align: center;
+
+    a {
+      color: var(--color-white);
+      text-decoration: underline;
+    }
+  }
+
+  &__fetch-fail {
+    margin-top: 1.5rem;
+  }
+}

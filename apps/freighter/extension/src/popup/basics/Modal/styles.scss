@@ -1,0 +1,24 @@
+:root {
+  --buttons-container-height: 3rem;
+}
+
+.ModalWrapper {
+  padding: 2rem 1.5rem 1rem 1.5rem;
+  box-sizing: border-box;
+
+  &__scrollbar {
+    height: 100vh;
+    display: flex;
+    align-items: end;
+    justify-content: center;
+  }
+
+  &__disable-scroll-x {
+    overflow-x: hidden;
+  }
+
+  &__header {
+    margin: 0 2rem 1.5rem;
+    text-align: center;
+  }
+}

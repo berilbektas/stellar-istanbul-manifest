@@ -1,0 +1,14 @@
+.NetworkModal {
+  &__content {
+    height: calc(var(--popup--height) - (var(--popup-vertical-padding) * 2));
+    position: absolute;
+    z-index: calc(var(--z-index-tooltip) + 1);
+    width: calc(100% - (var(--popup--side-padding) * 2));
+  }
+
+  &__button-row {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+  }
+}

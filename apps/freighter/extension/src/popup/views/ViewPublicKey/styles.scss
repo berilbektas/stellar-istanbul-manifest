@@ -1,0 +1,82 @@
+@use "../../styles/utils.scss" as *;
+
+.ViewPublicKey {
+  &__content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-grow: 1;
+    width: 100%;
+  }
+
+  &__form {
+    display: flex;
+    flex-flow: row wrap;
+    flex-grow: 1;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+
+    * {
+      text-align: center;
+    }
+
+    .FieldNote--error {
+      position: absolute;
+    }
+  }
+
+  &__account-name-display {
+    height: 2.75rem;
+    display: flex;
+    align-items: center;
+    text-align: center;
+  }
+
+  &--account-name-div {
+    > button {
+      background: none;
+      color: inherit;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
+
+    svg {
+      width: var(--back--button-dimension);
+    }
+  }
+
+  &__qr-code {
+    border: pxToRem(16px) solid var(--sds-clr-base-01);
+    height: 11.5rem;
+    width: 11.5rem;
+    background: var(--color-white);
+    border-radius: 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-top: 3rem;
+  }
+
+  &__address-copy-label {
+    font-size: 0.875rem;
+    line-height: 1.375rem;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 2rem;
+  }
+
+  &__address-copy {
+    font-size: 1rem;
+    line-height: 1.5rem;
+    color: var(--sds-clr-gray-12);
+  }
+
+  &__copy-btn {
+    margin-top: 1rem;
+  }
+
+  &__external-link {
+    width: 100%;
+  }
+}

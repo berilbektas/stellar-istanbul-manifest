@@ -1,0 +1,870 @@
+import { Store } from "redux";
+import semver from "semver";
+import * as StellarSdk from "stellar-sdk";
+import browser from "webextension-polyfill";
+
+import {
+  ExternalRequestAuthEntry,
+  ExternalRequestBlob,
+  ExternalRequestToken,
+  ExternalRequestTx,
+  ExternalRequest as Request,
+} from "@shared/api/types";
+import {
+  ResponseQueue,
+  SignTransactionResponse,
+  SignBlobResponse,
+  SignAuthEntryResponse,
+  AddTokenResponse,
+  RequestAccessResponse,
+  SetAllowedStatusResponse,
+} from "@shared/api/types/message-request";
+import { stellarSdkServer } from "@shared/api/helpers/stellarSdkServer";
+import {
+  FreighterApiInternalError,
+  FreighterApiDeclinedError,
+} from "@shared/api/helpers/extensionMessaging";
+import {
+  EXTERNAL_SERVICE_TYPES,
+  SIDEBAR_NAVIGATE,
+} from "@shared/constants/services";
+import {
+  MAINNET_NETWORK_DETAILS,
+  NetworkDetails,
+} from "@shared/constants/stellar";
+import { getSdk } from "@shared/helpers/stellar";
+
+import { MessageResponder } from "background/types";
+import { STELLAR_EXPERT_MEMO_REQUIRED_ACCOUNTS_URL } from "background/constants/apiUrls";
+import {
+  getIsMainnet,
+  getIsMemoValidationEnabled,
+  getNetworkDetails,
+  getAllowListSegment,
+} from "background/helpers/account";
+import { isSenderAllowed } from "background/helpers/allowListAuthorization";
+import { cachedFetch } from "background/helpers/cachedFetch";
+import { publicKeySelector } from "background/ducks/session";
+
+import { POPUP_HEIGHT, POPUP_WIDTH } from "constants/dimensions";
+import { CACHED_MEMO_REQUIRED_ACCOUNTS_ID } from "constants/localStorageTypes";
+import { TRANSACTION_WARNING } from "constants/transaction";
+
+import {
+  encodeObject,
+  getUrlHostname,
+  getPunycodedDomain,
+  TokenToAdd,
+  MessageToSign,
+  EntryToSign,
+} from "helpers/urls";
+
+import { FlaggedKeys, TransactionInfo } from "types/transactions";
+
+import {
+  authEntryQueue,
+  blobQueue,
+  getSidebarWindowId,
+  responseQueue,
+  tokenQueue,
+  transactionQueue,
+} from "./popupMessageListener";
+import {
+  QUEUE_ITEM_TTL_MS,
+  sidebarQueueUuids,
+} from "background/helpers/queueCleanup";
+
+import { getSidebarPort } from "background/helpers/sidebarPort";
+import { DataStorageAccess } from "background/helpers/dataStorageAccess";
+
+/** Create a resolve wrapper that silently ignores duplicate calls. */
+const makeSafeResolve = (resolve: (value: unknown) => void) => {
+  let resolved = false;
+  return (value: unknown) => {
+    if (resolved) return;
+    resolved = true;
+    resolve(value);
+  };
+};
+
+const openSigningWindow = async (
+  hashRoute: string,
+  uuid: string,
+  width?: number,
+) => {
+  const sidebarWindowId = getSidebarWindowId();
+  if (sidebarWindowId !== null) {
+    // Track this UUID as sidebar-routed at routing time so it gets
+    // cleaned up on sidebar disconnect, even if the signing view
+    // hasn't mounted yet (e.g. ConfirmSidebarRequest interstitial).
+    sidebarQueueUuids.add(uuid);
+
+    // Send navigation directly to the sidebar via its long-lived port
+    // instead of broadcasting to all extension listeners
+    const currentPort = getSidebarPort();
+    if (currentPort) {
+      currentPort.postMessage({ type: SIDEBAR_NAVIGATE, route: hashRoute });
+    }
+    try {
+      if ((browser as any).sidebarAction) {
+        // Firefox
+        await (browser as any).sidebarAction.open();
+      } else {
+        // Chrome and other Chromium browsers
+        await chrome.sidePanel.open({ windowId: sidebarWindowId });
+      }
+    } catch (_) {
+      // ignore if unavailable
+    }
+    return null;
+  }
+  return browser.windows.create({
+    url: browser.runtime.getURL(`/index.html#${hashRoute}`),
+    ...WINDOW_SETTINGS,
+    ...(width !== undefined ? { width } : {}),
+  });
+};
+
+/** Reject the dapp's pending request when the popup window is closed. */
+const rejectOnWindowClose = (
+  windowId: number,
+  safeResolve: (value: unknown) => void,
+  rejectValue: Record<string, unknown> = {
+    apiError: FreighterApiDeclinedError,
+    error: FreighterApiDeclinedError.message,
+  },
+) => {
+  const onWindowRemoved = (removedWindowId: number) => {
+    if (removedWindowId === windowId) {
+      browser.windows.onRemoved.removeListener(onWindowRemoved);
+      safeResolve(rejectValue);
+    }
+  };
+  browser.windows.onRemoved.addListener(onWindowRemoved);
+};
+
+interface WindowParams {
+  height: number;
+  type: "popup";
+  width: number;
+}
+
+const WINDOW_SETTINGS: WindowParams = {
+  type: "popup",
+  width: POPUP_WIDTH,
+  height: POPUP_HEIGHT + 32, // include browser frame height,
+};
+
+export const freighterApiMessageListener = (
+  request: Request,
+  sender: browser.Runtime.MessageSender,
+  sessionStore: Store,
+  localStore: DataStorageAccess,
+) => {
+  const requestAccess = async () => {
+    const publicKey = publicKeySelector(sessionStore.getState());
+
+    const { tab, url: tabUrl = "" } = sender;
+
+    const networkDetails = await getNetworkDetails({ localStore });
+
+    const allowListSegment = await getAllowListSegment({
+      publicKey,
+      networkDetails,
+      localStore,
+    });
+
+    if (isSenderAllowed({ sender, allowListSegment }) && publicKey) {
+      // okay, the requester checks out and we have public key, send it
+      return { publicKey };
+    }
+
+    // otherwise, we need to confirm either url or password. Maybe both
+    const uuid = crypto.randomUUID();
+    const encodeOrigin = encodeObject({ tab, url: tabUrl, uuid });
+
+    const popup = await openSigningWindow(
+      `/grant-access?${encodeOrigin}`,
+      uuid,
+    );
+
+    return new Promise((resolve) => {
+      const safeResolve = makeSafeResolve(resolve);
+
+      if (popup === undefined) {
+        safeResolve({
+          apiError: FreighterApiInternalError,
+          error: FreighterApiInternalError.message,
+        });
+      } else if (popup === null) {
+        setTimeout(
+          () =>
+            safeResolve({
+              apiError: FreighterApiDeclinedError,
+              error: FreighterApiDeclinedError.message,
+            }),
+          QUEUE_ITEM_TTL_MS,
+        );
+      } else {
+        rejectOnWindowClose(popup.id!, safeResolve);
+      }
+      const response = async (url: string, publicKey?: string) => {
+        // queue it up, we'll let user confirm the url looks okay and then we'll send publicKey
+        // if we're good, of course
+        if (url === tabUrl) {
+          /*
+            This timeout is a bit of a hack to ensure the window doesn't close before the promise resolves.
+            Wrapping in a setTimeout queues up the wndows.remove action into the event loop, but allows the promise to resolve first.
+            This is really only an issue in e2e tests as the e2e window closes too quickly to register a click.
+          */
+          setTimeout(() => {
+            if (popup?.id) {
+              // ensure the window is closed to prevent collisions with other popups
+              browser.windows.remove(popup.id);
+            }
+          }, 50);
+
+          safeResolve({ publicKey });
+          return;
+        }
+
+        safeResolve({
+          // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+          apiError: FreighterApiDeclinedError,
+          error: FreighterApiDeclinedError.message,
+        });
+      };
+
+      (responseQueue as ResponseQueue<RequestAccessResponse>).push({
+        response,
+        uuid,
+        createdAt: Date.now(),
+      });
+    });
+  };
+
+  const requestPublicKey = async () => {
+    try {
+      const publicKey = publicKeySelector(sessionStore.getState());
+      const networkDetails = await getNetworkDetails({ localStore });
+      const allowListSegment = await getAllowListSegment({
+        publicKey,
+        networkDetails,
+        localStore,
+      });
+
+      if (isSenderAllowed({ sender, allowListSegment }) && publicKey) {
+        // okay, the requester checks out and we have public key, send it
+        return { publicKey };
+      }
+
+      return { publicKey: "" };
+    } catch (e) {
+      return {
+        // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+        apiError: FreighterApiInternalError,
+        error: FreighterApiInternalError.message,
+      };
+    }
+  };
+
+  const submitToken = async () => {
+    try {
+      const { contractId, networkPassphrase: reqNetworkPassphrase } =
+        request as ExternalRequestToken;
+
+      const networkPassphrase =
+        reqNetworkPassphrase || MAINNET_NETWORK_DETAILS.networkPassphrase;
+
+      const { tab, url: tabUrl = "" } = sender;
+      const domain = getUrlHostname(tabUrl);
+      const punycodedDomain = getPunycodedDomain(domain);
+
+      const uuid = crypto.randomUUID();
+
+      const tokenInfo: TokenToAdd = {
+        domain: punycodedDomain,
+        tab,
+        url: tabUrl,
+        contractId,
+        networkPassphrase,
+        uuid,
+      };
+
+      tokenQueue.push({ token: tokenInfo, uuid, createdAt: Date.now() });
+      const encodedTokenInfo = encodeObject(tokenInfo);
+
+      const popup = await openSigningWindow(
+        `/add-token?${encodedTokenInfo}`,
+        uuid,
+      );
+
+      return new Promise((resolve) => {
+        const safeResolve = makeSafeResolve(resolve);
+
+        if (popup === undefined) {
+          safeResolve({
+            apiError: FreighterApiInternalError,
+          });
+        } else if (popup === null) {
+          setTimeout(
+            () =>
+              safeResolve({
+                apiError: FreighterApiDeclinedError,
+              }),
+            QUEUE_ITEM_TTL_MS,
+          );
+        } else {
+          rejectOnWindowClose(popup.id!, safeResolve, {
+            apiError: FreighterApiDeclinedError,
+          });
+        }
+        const response = (success: boolean) => {
+          if (success) {
+            safeResolve({
+              contractId,
+            });
+            return;
+          }
+
+          safeResolve({
+            apiError: FreighterApiDeclinedError,
+          });
+        };
+
+        (responseQueue as ResponseQueue<AddTokenResponse>).push({
+          response,
+          uuid,
+          createdAt: Date.now(),
+        });
+      });
+    } catch (e) {
+      return {
+        apiError: FreighterApiInternalError,
+      };
+    }
+  };
+
+  const submitTransaction = async () => {
+    try {
+      const {
+        transactionXdr,
+        network: _network,
+        networkPassphrase,
+        accountToSign,
+        address: addressToSign,
+      } = request as ExternalRequestTx;
+
+      const network =
+        _network === null || !_network
+          ? MAINNET_NETWORK_DETAILS.network
+          : _network;
+
+      const isMainnet = await getIsMainnet({ localStore });
+      const { networkUrl, networkPassphrase: currentNetworkPassphrase } =
+        await getNetworkDetails({ localStore });
+      const Sdk = getSdk(currentNetworkPassphrase);
+      const { tab, url: tabUrl = "" } = sender;
+
+      const transaction = Sdk.TransactionBuilder.fromXDR(
+        transactionXdr,
+        networkPassphrase || Sdk.Networks[network as keyof typeof Sdk.Networks],
+      );
+
+      const directoryLookupJson = await cachedFetch(
+        STELLAR_EXPERT_MEMO_REQUIRED_ACCOUNTS_URL,
+        CACHED_MEMO_REQUIRED_ACCOUNTS_ID,
+      );
+      const accountData = directoryLookupJson?._embedded?.records || [];
+
+      let _operations = [{}] as StellarSdk.Operation[];
+
+      if ("operations" in transaction) {
+        _operations = transaction.operations;
+      }
+
+      if ("innerTransaction" in transaction) {
+        _operations = transaction.innerTransaction.operations;
+      }
+
+      const flaggedKeys: FlaggedKeys = {};
+
+      const isValidatingMemo =
+        (await getIsMemoValidationEnabled({ localStore })) && isMainnet;
+
+      if (isValidatingMemo) {
+        _operations.forEach((operation: StellarSdk.Operation) => {
+          accountData.forEach(
+            ({ address, tags }: { address: string; tags: string[] }) => {
+              if (
+                "destination" in operation &&
+                address === operation.destination
+              ) {
+                let collectedTags = [...tags];
+
+                /* if the user has opted out of validation, remove applicable tags */
+                if (!isValidatingMemo) {
+                  collectedTags = collectedTags.filter(
+                    (tag) => tag !== TRANSACTION_WARNING.memoRequired,
+                  );
+                }
+                flaggedKeys[operation.destination] = {
+                  ...flaggedKeys[operation.destination],
+                  tags: collectedTags,
+                };
+              }
+            },
+          );
+        });
+      }
+
+      const server = stellarSdkServer(
+        networkUrl,
+        networkPassphrase || transaction.networkPassphrase,
+      );
+
+      try {
+        await server.checkMemoRequired(transaction as StellarSdk.Transaction);
+      } catch (e: any) {
+        if ("accountId" in e) {
+          flaggedKeys[e.accountId] = {
+            ...flaggedKeys[e.accountId],
+            tags: [TRANSACTION_WARNING.memoRequired],
+          };
+        }
+      }
+
+      const uuid = crypto.randomUUID();
+
+      const transactionInfo = {
+        transaction,
+        transactionXdr,
+        tab,
+        url: tabUrl,
+        flaggedKeys,
+        accountToSign: accountToSign || addressToSign,
+        uuid,
+      } as TransactionInfo;
+
+      transactionQueue.push({
+        transaction: transaction as StellarSdk.Transaction,
+        uuid,
+        createdAt: Date.now(),
+      });
+      const encodedBlob = encodeObject(transactionInfo);
+
+      const popup = await openSigningWindow(
+        `/sign-transaction?${encodedBlob}`,
+        uuid,
+      );
+
+      return new Promise((resolve) => {
+        const safeResolve = makeSafeResolve(resolve);
+
+        if (popup === undefined) {
+          safeResolve({
+            // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+            apiError: FreighterApiInternalError,
+            error: FreighterApiInternalError.message,
+          });
+        } else if (popup === null) {
+          setTimeout(
+            () =>
+              safeResolve({
+                apiError: FreighterApiDeclinedError,
+                error: FreighterApiDeclinedError.message,
+              }),
+            QUEUE_ITEM_TTL_MS,
+          );
+        } else {
+          rejectOnWindowClose(popup.id!, safeResolve);
+        }
+        const response = (
+          signedTransaction: string,
+          signerAddress?: string,
+        ) => {
+          if (signedTransaction) {
+            safeResolve({ signedTransaction, signerAddress });
+            return;
+          }
+
+          safeResolve({
+            // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+            apiError: FreighterApiDeclinedError,
+            error: FreighterApiDeclinedError.message,
+          });
+        };
+
+        (responseQueue as ResponseQueue<SignTransactionResponse>).push({
+          response,
+          uuid,
+          createdAt: Date.now(),
+        });
+      });
+    } catch (e) {
+      return {
+        // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+        apiError: FreighterApiInternalError,
+        error: FreighterApiInternalError.message,
+      };
+    }
+  };
+
+  const submitBlob = async () => {
+    try {
+      const { apiVersion, blob, accountToSign, address, networkPassphrase } =
+        request as ExternalRequestBlob;
+
+      const { tab, url: tabUrl = "" } = sender;
+      const domain = getUrlHostname(tabUrl);
+      const punycodedDomain = getPunycodedDomain(domain);
+
+      const uuid = crypto.randomUUID();
+
+      const blobData: MessageToSign = {
+        apiVersion,
+        domain: punycodedDomain,
+        tab,
+        message: blob,
+        url: tabUrl,
+        accountToSign: accountToSign || address,
+        networkPassphrase,
+        uuid,
+      };
+
+      blobQueue.push({ blob: blobData, uuid, createdAt: Date.now() });
+      const encodedBlob = encodeObject(blobData);
+      const popup = await openSigningWindow(
+        `/sign-message?${encodedBlob}`,
+        uuid,
+      );
+
+      return new Promise((resolve) => {
+        const safeResolve = makeSafeResolve(resolve);
+
+        if (popup === undefined) {
+          safeResolve({
+            // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+            apiError: FreighterApiInternalError,
+            error: FreighterApiInternalError.message,
+          });
+        } else if (popup === null) {
+          setTimeout(
+            () =>
+              safeResolve({
+                apiError: FreighterApiDeclinedError,
+                error: FreighterApiDeclinedError.message,
+              }),
+            QUEUE_ITEM_TTL_MS,
+          );
+        } else {
+          rejectOnWindowClose(popup.id!, safeResolve);
+        }
+
+        const response = (
+          signedBlob: SignBlobResponse,
+          signerAddress?: string,
+        ) => {
+          if (signedBlob) {
+            if (apiVersion && semver.gte(apiVersion, "4.0.0")) {
+              safeResolve({
+                signedBlob: signedBlob.toString("base64"),
+                signerAddress,
+              });
+              return;
+            }
+            safeResolve({ signedBlob, signerAddress });
+            return;
+          }
+
+          safeResolve({
+            // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+            apiError: FreighterApiDeclinedError,
+            error: FreighterApiDeclinedError.message,
+          });
+        };
+
+        (responseQueue as ResponseQueue<SignBlobResponse>).push({
+          response,
+          uuid,
+          createdAt: Date.now(),
+        });
+      });
+    } catch (e) {
+      return {
+        // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+        apiError: FreighterApiInternalError,
+        error: FreighterApiInternalError.message,
+      };
+    }
+  };
+
+  const submitAuthEntry = async () => {
+    try {
+      const {
+        apiVersion,
+        entryXdr,
+        accountToSign,
+        address,
+        networkPassphrase,
+      } = request as ExternalRequestAuthEntry;
+
+      const { tab, url: tabUrl = "" } = sender;
+      const domain = getUrlHostname(tabUrl);
+      const punycodedDomain = getPunycodedDomain(domain);
+
+      const uuid = crypto.randomUUID();
+
+      const authEntry: EntryToSign = {
+        entry: entryXdr,
+        accountToSign: accountToSign || address,
+        tab,
+        domain: punycodedDomain,
+        url: tabUrl,
+        networkPassphrase,
+        uuid,
+      };
+
+      authEntryQueue.push({ authEntry, uuid, createdAt: Date.now() });
+      const encodedAuthEntry = encodeObject(authEntry);
+      const popup = await openSigningWindow(
+        `/sign-auth-entry?${encodedAuthEntry}`,
+        uuid,
+      );
+
+      return new Promise((resolve) => {
+        const safeResolve = makeSafeResolve(resolve);
+
+        if (popup === undefined) {
+          safeResolve({
+            // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+            apiError: FreighterApiInternalError,
+            error: FreighterApiInternalError.message,
+          });
+        } else if (popup === null) {
+          setTimeout(
+            () =>
+              safeResolve({
+                apiError: FreighterApiDeclinedError,
+                error: FreighterApiDeclinedError.message,
+              }),
+            QUEUE_ITEM_TTL_MS,
+          );
+        } else {
+          rejectOnWindowClose(popup.id!, safeResolve);
+        }
+        const response = (
+          signedAuthEntry: SignAuthEntryResponse,
+          signerAddress?: string,
+        ) => {
+          if (signedAuthEntry) {
+            if (apiVersion && semver.gte(apiVersion, "4.2.0")) {
+              safeResolve({
+                signedAuthEntry:
+                  Buffer.from(signedAuthEntry).toString("base64"),
+                signerAddress,
+              });
+              return;
+            }
+            safeResolve({ signedAuthEntry, signerAddress });
+            return;
+          }
+
+          safeResolve({
+            // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+            apiError: FreighterApiDeclinedError,
+            error: FreighterApiDeclinedError.message,
+          });
+        };
+        (responseQueue as ResponseQueue<SignAuthEntryResponse>).push({
+          response,
+          uuid,
+          createdAt: Date.now(),
+        });
+      });
+    } catch (e) {
+      return {
+        // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+        apiError: FreighterApiInternalError,
+        error: FreighterApiInternalError.message,
+      };
+    }
+  };
+
+  const requestNetwork = async () => {
+    let network = "";
+
+    try {
+      ({ network } = await getNetworkDetails({ localStore }));
+    } catch (error) {
+      console.error(error);
+      return { error };
+    }
+
+    return { network };
+  };
+
+  const requestNetworkDetails = async () => {
+    let networkDetails = {
+      network: "",
+      networkName: "",
+      networkUrl: "",
+      networkPassphrase: "",
+      sorobanRpcUrl: undefined,
+    } as NetworkDetails;
+
+    try {
+      networkDetails = await getNetworkDetails({ localStore });
+    } catch (error) {
+      console.error(error);
+      return {
+        // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+        apiError: FreighterApiInternalError,
+        error: FreighterApiInternalError.message,
+      };
+    }
+    return { networkDetails };
+  };
+
+  const requestConnectionStatus = () => ({ isConnected: true });
+
+  const requestAllowedStatus = async () => {
+    try {
+      const publicKey = publicKeySelector(sessionStore.getState());
+      const networkDetails = await getNetworkDetails({ localStore });
+
+      const allowListSegment = await getAllowListSegment({
+        publicKey,
+        networkDetails,
+        localStore,
+      });
+      const isAllowed = isSenderAllowed({ sender, allowListSegment });
+
+      return { isAllowed };
+    } catch (e) {
+      return {
+        apiError: FreighterApiInternalError,
+      };
+    }
+  };
+
+  const setAllowedStatus = async () => {
+    const publicKey = publicKeySelector(sessionStore.getState());
+    const networkDetails = await getNetworkDetails({ localStore });
+    const allowListSegment = await getAllowListSegment({
+      publicKey,
+      networkDetails,
+      localStore,
+    });
+
+    const isAllowed = isSenderAllowed({ sender, allowListSegment });
+
+    const { tab, url: tabUrl = "" } = sender;
+
+    if (isAllowed) {
+      // okay, the requester checks out
+      return { isAllowed };
+    }
+
+    const uuid = crypto.randomUUID();
+    const encodeOrigin = encodeObject({ tab, url: tabUrl, uuid });
+
+    const popup = await openSigningWindow(
+      `/grant-access?${encodeOrigin}`,
+      uuid,
+      400,
+    );
+
+    return new Promise((resolve) => {
+      const safeResolve = makeSafeResolve(resolve);
+
+      if (popup === undefined) {
+        safeResolve({
+          apiError: FreighterApiInternalError,
+          error: FreighterApiInternalError.message,
+        });
+      } else if (popup === null) {
+        setTimeout(
+          () =>
+            safeResolve({
+              apiError: FreighterApiDeclinedError,
+              error: FreighterApiDeclinedError.message,
+            }),
+          QUEUE_ITEM_TTL_MS,
+        );
+      } else {
+        rejectOnWindowClose(popup.id!, safeResolve);
+      }
+      const response = async (url?: string) => {
+        // queue it up, we'll let user confirm the url looks okay and then we'll say it's okay
+        if (url === tabUrl) {
+          const updatedAllAccountsllowListSegment = await getAllowListSegment({
+            publicKey,
+            networkDetails,
+            localStore,
+          });
+          const isAllowedResponse = isSenderAllowed({
+            sender,
+            allowListSegment: updatedAllAccountsllowListSegment,
+          });
+
+          safeResolve({ isAllowed: isAllowedResponse });
+          return;
+        }
+
+        safeResolve({
+          // return 2 error formats: one for clients running older versions of freighter-api, and one to adhere to the standard wallet interface
+          apiError: FreighterApiDeclinedError,
+          error: FreighterApiDeclinedError.message,
+        });
+      };
+
+      (responseQueue as ResponseQueue<SetAllowedStatusResponse>).push({
+        response,
+        uuid,
+        createdAt: Date.now(),
+      });
+    });
+  };
+
+  const requestUserInfo = async () => {
+    const publicKey = publicKeySelector(sessionStore.getState());
+    const networkDetails = await getNetworkDetails({ localStore });
+    const allowListSegment = await getAllowListSegment({
+      publicKey,
+      networkDetails,
+      localStore,
+    });
+
+    const isAllowed = isSenderAllowed({ sender, allowListSegment });
+    const notAllowedUserInfo = {
+      publicKey: "",
+    };
+    const userInfo = isAllowed
+      ? {
+          publicKey,
+        }
+      : notAllowedUserInfo;
+
+    return {
+      userInfo,
+    };
+  };
+
+  const messageResponder: MessageResponder = {
+    [EXTERNAL_SERVICE_TYPES.REQUEST_ACCESS]: requestAccess,
+    [EXTERNAL_SERVICE_TYPES.REQUEST_PUBLIC_KEY]: requestPublicKey,
+    [EXTERNAL_SERVICE_TYPES.SUBMIT_TOKEN]: submitToken,
+    [EXTERNAL_SERVICE_TYPES.SUBMIT_TRANSACTION]: submitTransaction,
+    [EXTERNAL_SERVICE_TYPES.SUBMIT_BLOB]: submitBlob,
+    [EXTERNAL_SERVICE_TYPES.SUBMIT_AUTH_ENTRY]: submitAuthEntry,
+    [EXTERNAL_SERVICE_TYPES.REQUEST_NETWORK]: requestNetwork,
+    [EXTERNAL_SERVICE_TYPES.REQUEST_NETWORK_DETAILS]: requestNetworkDetails,
+    [EXTERNAL_SERVICE_TYPES.REQUEST_CONNECTION_STATUS]: requestConnectionStatus,
+    [EXTERNAL_SERVICE_TYPES.REQUEST_ALLOWED_STATUS]: requestAllowedStatus,
+    [EXTERNAL_SERVICE_TYPES.SET_ALLOWED_STATUS]: setAllowedStatus,
+    [EXTERNAL_SERVICE_TYPES.REQUEST_USER_INFO]: requestUserInfo,
+  };
+
+  return messageResponder[request.type]();
+};

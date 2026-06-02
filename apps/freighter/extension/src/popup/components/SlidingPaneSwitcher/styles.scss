@@ -1,0 +1,76 @@
+.multi-pane-slider {
+  position: relative;
+  width: 100%;
+  height: auto;
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  &__container {
+    position: relative;
+    width: 100%;
+    height: auto;
+    display: grid;
+    grid-template-areas: "pane";
+    overflow: hidden;
+  }
+
+  &__pane {
+    grid-area: pane;
+    position: relative;
+    width: 100%;
+    height: auto;
+    overflow: hidden;
+  }
+}
+
+.slide-out-left {
+  animation: slideOutLeft 300ms forwards;
+}
+
+.slide-out-right {
+  animation: slideOutRight 300ms forwards;
+}
+
+.slide-in-left {
+  animation: slideInLeft 300ms forwards;
+}
+
+.slide-in-right {
+  animation: slideInRight 300ms forwards;
+}
+
+@keyframes slideOutLeft {
+  from {
+    transform: translateX(0%);
+  }
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@keyframes slideOutRight {
+  from {
+    transform: translateX(0%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0%);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0%);
+  }
+}

@@ -1,0 +1,307 @@
+@use "../../styles/utils.scss" as *;
+
+.SignMessage {
+  height: var(--popup--height);
+  overflow: hidden;
+  position: relative;
+
+  &__Body {
+    display: flex;
+    flex-direction: column;
+    max-width: 57rem;
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+  }
+
+  &__TitleRow {
+    display: flex;
+    align-items: center;
+    margin-bottom: pxToRem(16px);
+
+    &__Detail {
+      display: flex;
+      flex-direction: column;
+      margin-left: pxToRem(12px);
+    }
+
+    &__Domain {
+      font-size: pxToRem(14px);
+      color: var(--sds-clr-gray-11);
+    }
+  }
+
+  &__Metadata {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: pxToRem(12px) pxToRem(16px);
+    border-radius: pxToRem(16px);
+    background-color: var(--sds-clr-gray-03);
+    margin-top: pxToRem(12px);
+
+    &__Row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+
+      &:not(:last-child) {
+        margin-bottom: pxToRem(12px);
+        padding-bottom: pxToRem(12px);
+        border-bottom: 1px solid var(--sds-clr-gray-06);
+      }
+    }
+
+    &__Label {
+      display: flex;
+      align-items: center;
+      color: var(--sds-clr-gray-11);
+
+      svg {
+        margin-right: pxToRem(8px);
+      }
+    }
+  }
+
+  &__Warning {
+    color: var(--sds-clr-gray-10);
+    text-align: center;
+    font-size: pxToRem(14px);
+    font-style: normal;
+    font-weight: 500;
+    line-height: pxToRem(20px);
+  }
+
+  &__Actions {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+
+    .Button:first-child {
+      margin-right: pxToRem(12px);
+    }
+    margin-bottom: pxToRem(12px);
+  }
+
+  &__CancelBtn {
+    font-weight: 600;
+  }
+
+  &__BlockaidBanner {
+    margin-bottom: pxToRem(16px);
+  }
+
+  &__MainPane {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  &__BlockaidDetails {
+    display: flex;
+    flex-direction: column;
+
+    &__Header {
+      display: flex;
+      justify-content: space-between;
+
+      .WarningMark {
+        display: flex;
+        width: 40px;
+        height: 40px;
+        padding: 7.5px;
+        justify-content: center;
+        align-items: center;
+        aspect-ratio: 1/1;
+        border-radius: 8px;
+        border: 1px solid var(--sds-clr-amber-06);
+        background: var(--sds-clr-amber-03);
+
+        svg {
+          width: 25px;
+          height: 25px;
+          color: var(--sds-clr-amber-09);
+        }
+      }
+
+      .WarningMarkError {
+        display: flex;
+        width: 40px;
+        height: 40px;
+        padding: 7.5px;
+        justify-content: center;
+        align-items: center;
+        aspect-ratio: 1/1;
+        border-radius: 8px;
+        border: 1px solid var(--sds-clr-red-06);
+        background: var(--sds-clr-red-03);
+
+        svg {
+          width: 25px;
+          height: 25px;
+          color: var(--sds-clr-red-09);
+        }
+      }
+
+      .Close {
+        display: flex;
+        width: 32px;
+        height: 32px;
+        justify-content: center;
+        align-items: center;
+        border-radius: 1000px;
+        background: var(--sds-clr-gray-03);
+        color: var(--sds-clr-gray-09);
+      }
+    }
+
+    &__Title {
+      display: flex;
+      margin: pxToRem(16px) 0 pxToRem(8px);
+      font-size: pxToRem(18px);
+      font-weight: 500;
+      justify-content: flex-start;
+      text-align: left;
+      width: 100%;
+    }
+
+    &__SubTitle {
+      font-size: pxToRem(14px);
+      font-weight: 400;
+      line-height: pxToRem(20px);
+      margin-bottom: pxToRem(16px);
+      color: var(--sds-clr-gray-11);
+    }
+
+    &__Details {
+      display: flex;
+      padding: pxToRem(12px) pxToRem(16px);
+      flex-direction: column;
+      justify-content: center;
+      background-color: var(--sds-clr-gray-03);
+      border-radius: pxToRem(16px);
+
+      .BlockaidByLine {
+        margin-top: pxToRem(12px);
+        padding-top: pxToRem(12px);
+        border-top: 1px solid var(--sds-clr-gray-06);
+      }
+    }
+
+    &__DetailRow {
+      display: flex;
+
+      &:first-child {
+        margin-top: pxToRem(8px);
+      }
+
+      &:not(:last-child) {
+        margin-bottom: pxToRem(8px);
+      }
+
+      svg {
+        width: 16px;
+        height: 16px;
+        color: var(--sds-clr-gray-09);
+        margin-right: pxToRem(8px);
+      }
+
+      span {
+        flex: 3;
+        word-break: break-word;
+        font-size: pxToRem(16px);
+        font-weight: 500;
+      }
+    }
+
+    &__DetailRowError {
+      display: flex;
+
+      &:first-child {
+        margin-top: pxToRem(8px);
+      }
+
+      &:not(:last-child) {
+        margin-bottom: pxToRem(8px);
+      }
+
+      svg {
+        width: 16px;
+        height: 16px;
+        color: var(--sds-clr-red-09);
+        margin-right: pxToRem(8px);
+      }
+
+      span {
+        flex: 3;
+        word-break: break-word;
+        font-size: pxToRem(16px);
+        font-weight: 500;
+      }
+    }
+  }
+
+  .Blob {
+    display: -webkit-box;
+    width: 100%;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    word-wrap: break-word;
+  }
+
+  &__inner-transaction {
+    border: 1px solid var(--pal-border-primary);
+    border-radius: 0.5rem;
+    height: 10rem;
+    opacity: 0.7;
+    overflow: auto;
+    padding: 1rem 2rem;
+    zoom: 0.7;
+  }
+
+  &__info {
+    margin-bottom: 2rem;
+  }
+
+  &__subject {
+    border-bottom: 1px solid var(--pal-border-secondary);
+    color: var(--pal-text-primary);
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  &__approval {
+    margin-bottom: -1rem;
+
+    &__title {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.875rem;
+      line-height: 1.5rem;
+    }
+  }
+
+  &__current-account {
+    align-items: flex-start;
+    display: flex;
+    justify-content: space-between;
+    margin: 1rem 0 0.5rem 0;
+    width: 100%;
+
+    &__chevron {
+      display: flex;
+      width: 0.75rem;
+    }
+  }
+
+  &__modal {
+    padding: 0.5rem 0 0.5rem 1.5rem;
+  }
+
+  &__account-not-found {
+    margin-top: 1rem;
+  }
+}

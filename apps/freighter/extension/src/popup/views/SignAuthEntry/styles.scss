@@ -1,0 +1,142 @@
+@use "../../styles/utils.scss" as *;
+
+.SignAuthEntry {
+  height: var(--popup--height);
+  overflow: hidden;
+  position: relative;
+
+  &__Body {
+    display: flex;
+    flex-direction: column;
+  }
+
+  &__TitleRow {
+    display: flex;
+    align-items: center;
+    margin-bottom: pxToRem(16px);
+
+    &__Detail {
+      display: flex;
+      flex-direction: column;
+      margin-left: pxToRem(12px);
+    }
+
+    &__Domain {
+      font-size: pxToRem(14px);
+      color: var(--sds-clr-gray-11);
+    }
+  }
+
+  &__Metadata {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: pxToRem(12px) pxToRem(16px);
+    border-radius: pxToRem(16px);
+    background-color: var(--sds-clr-gray-03);
+    margin-top: pxToRem(12px);
+
+    &__Row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+
+      &:not(:last-child) {
+        margin-bottom: pxToRem(12px);
+        padding-bottom: pxToRem(12px);
+        border-bottom: 1px solid var(--sds-clr-gray-06);
+      }
+    }
+
+    &__Label {
+      display: flex;
+      align-items: center;
+      color: var(--sds-clr-gray-11);
+
+      svg {
+        margin-right: pxToRem(8px);
+      }
+    }
+
+    &__Value {
+      .CopyValue {
+        max-width: pxToRem(120px);
+
+        .Value {
+          max-width: pxToRem(100px);
+          text-overflow: ellipsis;
+          white-space: pre-wrap;
+          overflow: hidden;
+        }
+
+        svg {
+          color: var(--sds-clr-gray-09);
+        }
+      }
+    }
+  }
+
+  .AuthEntry {
+    display: -webkit-box;
+    width: 100%;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    word-wrap: break-word;
+  }
+
+  &__inner-transaction {
+    border: 1px solid var(--pal-border-primary);
+    border-radius: 0.5rem;
+    height: 10rem;
+    opacity: 0.7;
+    overflow: auto;
+    padding: 1rem 2rem;
+    zoom: 0.7;
+  }
+
+  &__info {
+    margin-bottom: 2rem;
+  }
+
+  &__subject {
+    border-bottom: 1px solid var(--pal-border-secondary);
+    color: var(--pal-text-primary);
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  &__approval {
+    margin-bottom: -1rem;
+
+    &__title {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.875rem;
+      line-height: 1.5rem;
+    }
+  }
+
+  &__current-account {
+    align-items: flex-start;
+    display: flex;
+    justify-content: space-between;
+    margin: 1rem 0 0.5rem 0;
+    width: 100%;
+
+    &__chevron {
+      display: flex;
+      width: 0.75rem;
+    }
+  }
+
+  &__modal {
+    padding: 0.5rem 0 0.5rem 1.5rem;
+  }
+
+  &__account-not-found {
+    margin-top: 1rem;
+  }
+}

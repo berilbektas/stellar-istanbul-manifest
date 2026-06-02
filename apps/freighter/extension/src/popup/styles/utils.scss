@@ -1,0 +1,19 @@
+@use "sass:math";
+
+// Convert px to rem
+$base-font-size: 16px;
+
+@function removePxUnit($value) {
+  @return math.div($value, $value * 0 + 1);
+}
+
+@function pxToRem($pxValue) {
+  @return #{math.div(removePxUnit($pxValue), removePxUnit($base-font-size))}rem;
+}
+
+@mixin native-like-outline {
+  outline-color: rgb(153, 200, 255);
+  outline-offset: 1px;
+  outline-style: auto;
+  outline-width: 1px;
+}

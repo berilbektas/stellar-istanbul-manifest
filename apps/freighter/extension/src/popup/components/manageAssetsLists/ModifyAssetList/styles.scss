@@ -1,0 +1,86 @@
+@use "../../../styles/utils.scss" as *;
+
+.ModifyAssetList {
+  &__label {
+    color: var(--sds-clr-gray-11);
+    font-size: pxToRem(14px);
+    line-height: pxToRem(20px);
+  }
+
+  &__input {
+    margin-top: pxToRem(8px);
+    margin-bottom: pxToRem(16px);
+  }
+
+  &__results {
+    display: flex;
+    flex-direction: column;
+    height: 20rem;
+    margin-top: pxToRem(16px);
+    margin-top: pxToRem(24px);
+    overflow: scroll;
+
+    .View__inset {
+      height: 100%;
+    }
+  }
+
+  &__enable {
+    margin-top: 2rem;
+    display: flex;
+    gap: 0.5rem;
+    justify-content: space-between;
+  }
+
+  &__submit-error {
+    margin-top: auto;
+  }
+
+  &__not-found {
+    color: var(--sds-clr-red-09);
+    font-size: 0.75rem;
+    line-height: 1.125rem;
+    margin: 0 0 1.25rem 0;
+  }
+
+  &__info {
+    display: flex;
+    flex-direction: column;
+    background: var(--sds-clr-gray-03);
+    border-radius: pxToRem(16px);
+    padding: pxToRem(16px);
+
+    &__title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: pxToRem(12px);
+      margin-bottom: pxToRem(12px);
+      border-bottom: 1px solid var(--sds-clr-gray-06);
+    }
+
+    &__name {
+      font-size: pxToRem(16px);
+      line-height: pxToRem(24px);
+      margin-bottom: pxToRem(8px);
+    }
+
+    &__title {
+      color: var(--sds-clr-gray-11);
+      font-size: pxToRem(14px);
+      line-height: pxToRem(20px);
+    }
+
+    &__provider {
+      color: var(--sds-clr-gray-11);
+      font-size: pxToRem(14px);
+      line-height: pxToRem(20px);
+    }
+
+    &__description {
+      color: var(--sds-clr-gray-12);
+      font-size: pxToRem(14px);
+      line-height: pxToRem(20px);
+    }
+  }
+}

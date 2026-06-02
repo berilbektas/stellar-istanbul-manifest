@@ -1,0 +1,57 @@
+.DisplayMnemonicPhrase {
+  &__content {
+    font-size: 1rem;
+    line-height: 1.5rem;
+    font-weight: var(--font-weight-regular);
+
+    p {
+      color: var(--sds-clr-gray-12);
+    }
+
+    strong {
+      color: var(--sds-clr-gray-12);
+    }
+  }
+
+  &__screen {
+    flex-flow: row wrap;
+    justify-content: space-between;
+  }
+
+  &__half-screen {
+    flex-direction: column;
+    justify-content: start;
+  }
+
+  &__display-buttons {
+    margin-bottom: 2.5rem;
+    margin-right: 1rem;
+    position: relative;
+    text-align: right;
+
+    img {
+      margin-left: 0.5rem;
+    }
+  }
+
+  &__download-button {
+    background: none;
+    border: none;
+    margin-right: 1.5rem;
+  }
+
+  .CopyText {
+    &:hover {
+      opacity: 1;
+    }
+  }
+
+  .IconButton {
+    &__label {
+      color: var(--sds-clr-gray-12);
+    }
+    svg {
+      fill: var(--sds-clr-gray-12);
+    }
+  }
+}

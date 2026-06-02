@@ -1,0 +1,849 @@
+import BigNumber from "bignumber.js";
+import {
+  Address,
+  Asset,
+  Memo,
+  MemoType,
+  Operation,
+  StrKey,
+  Transaction,
+  TransactionBuilder,
+  scValToNative,
+  xdr,
+  walkInvocationTree,
+} from "stellar-sdk";
+
+import { HorizonOperation, SorobanBalance } from "@shared/api/types";
+import { NetworkDetails } from "@shared/constants/stellar";
+import {
+  ArgsForTransferInvocation,
+  SorobanTokenInterface,
+  HostFnInvocationArgs,
+  SorobanCollectibleInterface,
+} from "@shared/constants/soroban/token";
+import { AccountBalances } from "helpers/hooks/useGetBalances";
+import { getAssetFromCanonical, getCanonicalFromAsset } from "helpers/stellar";
+import { findAssetBalance, isSorobanBalance } from "./balance";
+import { getSdk } from "@shared/helpers/stellar";
+import { AssetType } from "@shared/api/types/account-balance";
+import { getNativeContractDetails } from "./searchAsset";
+import { getTokenDetails } from "@shared/api/internal";
+import { isContractId } from "@shared/api/helpers/soroban";
+export { isContractId } from "@shared/api/helpers/soroban";
+
+export const SOROBAN_OPERATION_TYPES = [
+  "invoke_host_function",
+  "invokeHostFunction",
+];
+
+// All assets on the classic side have 7 decimals
+// https://developers.stellar.org/docs/fundamentals-and-concepts/stellar-data-structures/assets#amount-precision
+export const CLASSIC_ASSET_DECIMALS = 7;
+
+/**
+ * Gets the correct decimals for an asset.
+ * For Soroban contracts, fetches decimals via RPC.
+ * For native XLM and classic assets, returns CLASSIC_ASSET_DECIMALS (7) without throwing.
+ *
+ * @throws Error if the RPC call succeeds but returns no decimals (only for Soroban contracts)
+ * @param params - Parameters object
+ * @param params.assetIssuer - The asset issuer (contract ID for Soroban, issuer address for classic, null for native)
+ * @param params.publicKey - The public key for the account
+ * @param params.networkDetails - Network configuration details
+ * @returns The number of decimals for the asset
+ */
+export const getDecimalsForAsset = async ({
+  assetIssuer,
+  publicKey,
+  networkDetails,
+}: {
+  assetIssuer: string | null;
+  publicKey: string;
+  networkDetails: NetworkDetails;
+}): Promise<number> => {
+  // For Soroban contracts, fetch decimals via RPC
+  if (assetIssuer && isContractId(assetIssuer)) {
+    const tokenDetails = await getTokenDetails({
+      contractId: assetIssuer,
+      publicKey,
+      networkDetails,
+    });
+
+    if (tokenDetails && tokenDetails.decimals !== undefined) {
+      return tokenDetails.decimals;
+    }
+
+    // If API call succeeded but no decimals returned, throw
+    throw new Error(`Unable to fetch decimals for contract ${assetIssuer}`);
+  }
+
+  // For native XLM and classic assets, return standard decimals
+  return CLASSIC_ASSET_DECIMALS;
+};
+
+/**
+ * Checks if a transaction is a Soroban transaction.
+ * A transaction is considered Soroban if:
+ * - The selected balance is a Soroban token (has a contractId), OR
+ * - The recipient address is a contract address, OR
+ * - The isToken flag is true and contractId exists, OR
+ * - The isInvokeHostFn flag is true (for history operations)
+ *
+ * @param params - Parameters object
+ * @param params.selectedBalance - The selected balance (can be undefined)
+ * @param params.recipientAddress - The recipient address (can be undefined)
+ * @param params.isToken - Flag indicating if this is a token transaction (can be undefined)
+ * @param params.contractId - Contract ID for the token (can be undefined)
+ * @param params.isInvokeHostFn - Flag indicating if this is an invoke host function operation (can be undefined)
+ * @returns True if the transaction is a Soroban transaction, false otherwise
+ */
+export const isSorobanTransaction = ({
+  selectedBalance,
+  recipientAddress,
+  isToken,
+  contractId,
+  isInvokeHostFn,
+}: {
+  selectedBalance?: AssetType;
+  recipientAddress?: string;
+  isToken?: boolean;
+  contractId?: string;
+  isInvokeHostFn?: boolean;
+}): boolean => {
+  // Check if it's an invoke host function operation (for history)
+  if (isInvokeHostFn) {
+    return true;
+  }
+
+  // Check if selected balance is a Soroban balance (has contractId)
+  if (selectedBalance && isSorobanBalance(selectedBalance)) {
+    return true;
+  }
+
+  // Check if recipient address is a contract address
+  if (recipientAddress && isContractId(recipientAddress)) {
+    return true;
+  }
+
+  // Check if isToken flag is true and contractId exists
+  if (isToken && contractId) {
+    return true;
+  }
+
+  return false;
+};
+
+/**
+ * Extracts the contract ID from transaction data.
+ *
+ * This function determines which contract ID to use based on the transaction type:
+ * - For collectibles: returns the collection address
+ * - For tokens: extracts contract ID from the token ID using getContractIdFromTokenId
+ * - For other types: returns undefined
+ *
+ * @param params - Parameters object
+ * @param params.isCollectible - Whether this transaction involves a collectible (NFT)
+ * @param params.collectionAddress - The contract address of the collectible collection
+ * @param params.isToken - Whether this transaction involves a Soroban token
+ * @param params.asset - The asset identifier (token ID or symbol:contractId format)
+ * @param params.networkDetails - Network configuration details for resolving contract IDs
+ * @returns The contract ID if available, undefined otherwise
+ *
+ * @example
+ * // For a collectible transaction
+ * getContractIdFromTransactionData({
+ *   isCollectible: true,
+ *   collectionAddress: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4",
+ *   isToken: false,
+ *   asset: "",
+ *   networkDetails: testnetDetails
+ * })
+ * // Returns: "CAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABSC4"
+ *
+ * @example
+ * // For a token transaction
+ * getContractIdFromTransactionData({
+ *   isCollectible: false,
+ *   collectionAddress: "",
+ *   isToken: true,
+ *   asset: "USDC:CAQEEHVUG3D5YACMWVYGG7XQNQB3O6T6PK6TPZSDP75H3PVY7KDUMQQ",
+ *   networkDetails: testnetDetails
+ * })
+ * // Returns: "CAQEEHVUG3D5YACMWVYGG7XQNQB3O6T6PK6TPZSDP75H3PVY7KDUMQQ"
+ *
+ * @example
+ * // For a non-token, non-collectible transaction
+ * getContractIdFromTransactionData({
+ *   isCollectible: false,
+ *   collectionAddress: "",
+ *   isToken: false,
+ *   asset: "native",
+ *   networkDetails: testnetDetails
+ * })
+ * // Returns: undefined
+ */
+export const getContractIdFromTransactionData = ({
+  isCollectible,
+  collectionAddress,
+  isToken,
+  asset,
+  networkDetails,
+}: {
+  isCollectible: boolean;
+  collectionAddress: string;
+  isToken: boolean;
+  asset: string;
+  networkDetails: NetworkDetails;
+}) => {
+  if (isCollectible && collectionAddress) {
+    return collectionAddress;
+  }
+
+  if (!isToken || !asset) {
+    return undefined;
+  }
+  return getContractIdFromTokenId(asset, networkDetails);
+};
+
+/**
+ * Extracts contract ID from a token ID string.
+ * Token ID format:
+ * - "native" for XLM
+ * - "CODE:ISSUER" for classic tokens
+ * - Contract address for Soroban tokens
+ * - "SYMBOL:CONTRACTID" for Soroban tokens with symbol
+ *
+ * @param tokenId - The token identifier string
+ * @returns Contract ID if the token is a Soroban token, undefined otherwise
+ */
+export const getContractIdFromTokenId = (
+  tokenId: string,
+  networkDetails: NetworkDetails,
+): string | undefined => {
+  if (tokenId === "native") {
+    return getNativeContractDetails(networkDetails).contract;
+  }
+
+  // Check if tokenId itself is a contract ID
+  if (isContractId(tokenId)) {
+    return tokenId;
+  }
+
+  // Check if it's SYMBOL:CONTRACTID format (Soroban token)
+  // Split by : and check if the second part is a contract ID
+  const parts = tokenId.split(":");
+  if (parts.length === 2 && isContractId(parts[1])) {
+    // This is a Soroban token in SYMBOL:CONTRACTID format
+    return parts[1];
+  }
+
+  // Classic token format: CODE:ISSUER (no contract ID)
+  return undefined;
+};
+
+export const getAssetDecimals = (
+  asset: string,
+  balances: AccountBalances,
+  isToken: boolean,
+) => {
+  if (isToken) {
+    const _balances = balances.balances;
+    const canonical = getAssetFromCanonical(asset);
+    const balance = findAssetBalance(_balances, canonical);
+
+    if (balance && "decimals" in balance) {
+      return Number(balance.decimals);
+    }
+  }
+
+  return CLASSIC_ASSET_DECIMALS;
+};
+
+export const getTokenBalance = (tokenBalance: SorobanBalance) =>
+  formatTokenAmount(
+    new BigNumber(tokenBalance.total),
+    Number(tokenBalance.decimals),
+  );
+
+export const getAvailableBalance = ({
+  assetCanonical,
+  balances,
+  recommendedFee,
+}: {
+  assetCanonical: string;
+  balances: AssetType[];
+  recommendedFee: string;
+}) => {
+  const selectedCanonical = getAssetFromCanonical(assetCanonical);
+  const selectedBalance = findAssetBalance(balances, selectedCanonical);
+  if (selectedBalance) {
+    if (isSorobanBalance(selectedBalance)) {
+      return getTokenBalance(selectedBalance);
+    }
+
+    const balance = selectedBalance.total;
+    if ("minimumBalance" in selectedBalance && selectedBalance.minimumBalance) {
+      // take base reserve into account for XLM payments
+      const minBalance = selectedBalance.minimumBalance;
+      const currentBal = new BigNumber(balance.toFixed());
+      const available = currentBal
+        .minus(minBalance)
+        .minus(new BigNumber(Number(recommendedFee)));
+
+      // Ensure we don't go below zero
+      return BigNumber.max(available, new BigNumber(0)).toFixed().toString();
+    } else {
+      return new BigNumber(balance).toFixed().toString();
+    }
+  }
+  return "0";
+};
+
+// Adopted from https://github.com/ethers-io/ethers.js/blob/master/packages/bignumber/src.ts/fixednumber.ts#L27
+export const formatTokenAmount = (amount: BigNumber, decimals: number) => {
+  let formatted = amount.toString();
+
+  if (decimals > 0) {
+    formatted = amount.shiftedBy(-decimals).toFixed(decimals).toString();
+
+    // Trim trailing zeros
+    while (formatted[formatted.length - 1] === "0") {
+      formatted = formatted.substring(0, formatted.length - 1);
+    }
+
+    if (formatted.endsWith(".")) {
+      formatted = formatted.substring(0, formatted.length - 1);
+    }
+  }
+
+  return formatted;
+};
+
+export const parseTokenAmount = (value: string, decimals: number) => {
+  const comps = value.split(".");
+
+  let whole = comps[0];
+  let fraction = comps[1];
+  if (!whole) {
+    whole = "0";
+  }
+  if (!fraction) {
+    fraction = "0";
+  }
+
+  // Trim trailing zeros
+  while (fraction[fraction.length - 1] === "0") {
+    fraction = fraction.substring(0, fraction.length - 1);
+  }
+
+  // If decimals is 0, we have an empty string for fraction
+  if (fraction === "") {
+    fraction = "0";
+  }
+
+  // Fully pad the string with zeros to get to value
+  while (fraction.length < decimals) {
+    fraction += "0";
+  }
+
+  const wholeValue = new BigNumber(whole);
+  const fractionValue = new BigNumber(fraction);
+
+  return wholeValue.shiftedBy(decimals).plus(fractionValue);
+};
+
+export const addressToString = (address: xdr.ScAddress) => {
+  if (address.switch().name === "scAddressTypeAccount") {
+    return StrKey.encodeEd25519PublicKey(address.accountId().ed25519());
+  }
+
+  return Address.fromScAddress(address).toString();
+};
+
+export const getArgsForTokenInvocation = (
+  fnName: string,
+  args: xdr.ScVal[],
+): ArgsForTransferInvocation => {
+  let tokenId: number | undefined;
+  let amount: bigint | number | undefined;
+  let from = "";
+  let to = "";
+  const thirdArgType = args[2].switch();
+
+  switch (fnName) {
+    case SorobanTokenInterface.transfer:
+    case SorobanCollectibleInterface.transfer:
+      // both SEP-41 & SEP-50 tokens use the transfer method
+      // with different signatures. Without parsing the token spec,
+      // we can guess that the contract is either a token or a collectible
+      // by the type of the 3rd argument.
+      // Token transfer - (from: Address, to: Address, amount: i128)
+      // Collectible transfer - (from: Address, to: Address, tokenId: u32)
+      if (thirdArgType === xdr.ScValType.scvI128()) {
+        amount = scValToNative(args[2]);
+      }
+      if (thirdArgType === xdr.ScValType.scvU32()) {
+        tokenId = scValToNative(args[2]);
+      }
+      from = addressToString(args[0].address());
+      to = addressToString(args[1].address());
+      break;
+    case SorobanTokenInterface.mint:
+      to = addressToString(args[0].address());
+      amount = scValToNative(args[1]);
+      break;
+    default:
+      amount = BigInt(0);
+  }
+
+  return { from, to, amount, tokenId };
+};
+
+const isSorobanOp = (operation: HorizonOperation) =>
+  SOROBAN_OPERATION_TYPES.includes(operation.type);
+
+export const getInvocationArgsFromInvokeHostFn = (
+  hostFn: Operation.InvokeHostFunction,
+): HostFnInvocationArgs | null => {
+  if (!hostFn?.func?.invokeContract) {
+    return null;
+  }
+
+  let invokedContract: xdr.InvokeContractArgs;
+
+  try {
+    invokedContract = hostFn.func.invokeContract();
+  } catch (e) {
+    return null;
+  }
+
+  const contractId = addressToString(invokedContract.contractAddress());
+
+  const fnName = invokedContract.functionName().toString();
+  const args = invokedContract.args();
+
+  if (
+    fnName !== SorobanTokenInterface.transfer &&
+    fnName !== SorobanTokenInterface.mint &&
+    fnName !== SorobanCollectibleInterface.transfer
+  ) {
+    return null;
+  }
+
+  let opArgs;
+
+  try {
+    opArgs = getArgsForTokenInvocation(fnName, args);
+  } catch (e) {
+    return null;
+  }
+
+  return {
+    fnName,
+    contractId,
+    ...opArgs,
+  };
+};
+
+export const getAttrsFromSorobanHorizonOp = (
+  operation: HorizonOperation,
+  networkDetails: NetworkDetails,
+) => {
+  if (!isSorobanOp(operation)) {
+    return null;
+  }
+
+  const txEnvelope = TransactionBuilder.fromXDR(
+    operation.transaction_attr.envelope_xdr as string,
+    networkDetails.networkPassphrase,
+  ) as Transaction<Memo<MemoType>, Operation.InvokeHostFunction[]>;
+
+  const invokeHostFn = txEnvelope.operations[0]; // only one op per tx in Soroban right now
+
+  return getInvocationArgsFromInvokeHostFn(invokeHostFn);
+};
+
+export interface InvocationTree {
+  type: string;
+  args: any;
+  invocations: InvocationTree[];
+}
+
+export function buildInvocationTree(root: xdr.SorobanAuthorizedInvocation) {
+  const fn = root.function();
+  const output = {} as InvocationTree;
+  const inner = fn.value();
+
+  switch (fn.switch().value) {
+    // sorobanAuthorizedFunctionTypeContractFn
+    case 0: {
+      const _inner = inner as xdr.InvokeContractArgs;
+      output.type = "execute";
+      output.args = {
+        source: Address.fromScAddress(_inner.contractAddress()).toString(),
+        function: _inner.functionName().toString(),
+        args: _inner.args().map((arg) => scValToNative(arg)),
+      };
+      break;
+    }
+
+    // sorobanAuthorizedFunctionTypeCreateContractHostFn
+    case 2:
+    case 1: {
+      const _inner = inner as xdr.CreateContractArgs | xdr.CreateContractArgsV2;
+      output.type = "create";
+      output.args = {} as {
+        type: string;
+        wasm: any;
+      };
+
+      // If the executable is a WASM, the preimage MUST be an address. If it's a
+      // token, the preimage MUST be an asset. This is a cheeky way to check
+      // that, because wasm=0, token=1 and address=0, asset=1 in the XDR switch
+      // values.
+      //
+      // The first part may not be true in V2, but we'd need to update this code
+      // anyway so it can still be an error.
+      const [exec, preimage] = [
+        _inner.executable(),
+        _inner.contractIdPreimage(),
+      ];
+      if (!!exec.switch().value !== !!preimage.switch().value) {
+        throw new Error(
+          `creation function appears invalid: ${JSON.stringify(
+            inner,
+          )} (should be wasm+address or token+asset)`,
+        );
+      }
+
+      switch (exec.switch().value) {
+        // contractExecutableWasm
+        case 0: {
+          /** @type {xdr.ContractIdPreimageFromAddress} */
+          const details = preimage.fromAddress();
+
+          output.args.type = "wasm";
+          output.args.wasm = {
+            salt: details.salt().toString("hex"),
+            hash: exec.wasmHash().toString("hex"),
+            address: Address.fromScAddress(details.address()).toString(),
+          };
+          // create contract V2
+          if (fn.switch().value === 2) {
+            const v2Args = _inner as xdr.CreateContractArgsV2;
+            output.args.constructorArgs = v2Args.constructorArgs();
+          }
+          break;
+        }
+
+        // contractExecutableStellarAsset
+        case 1:
+          output.args.type = "sac";
+          output.args.asset = Asset.fromOperation(
+            preimage.fromAsset(),
+          ).toString();
+          // create contract V2
+          if (fn.switch().value === 2) {
+            const v2Args = _inner as xdr.CreateContractArgsV2;
+            output.args.constructorArgs = v2Args.constructorArgs();
+          }
+          break;
+
+        default:
+          throw new Error(`unknown creation type: ${JSON.stringify(exec)}`);
+      }
+
+      break;
+    }
+
+    default:
+      throw new Error(
+        `unknown invocation type (${fn.switch()}): ${JSON.stringify(fn)}`,
+      );
+  }
+
+  output.invocations = root.subInvocations().map((i) => buildInvocationTree(i));
+  return output;
+}
+
+export const scValByType = (scVal: xdr.ScVal) => {
+  switch (scVal.switch()) {
+    case xdr.ScValType.scvAddress(): {
+      const address = scVal.address();
+      const addressType = address.switch();
+      if (addressType.name === "scAddressTypeAccount") {
+        return StrKey.encodeEd25519PublicKey(address.accountId().ed25519());
+      }
+      return addressToString(address);
+    }
+
+    case xdr.ScValType.scvBool(): {
+      return scVal.b();
+    }
+
+    case xdr.ScValType.scvBytes(): {
+      return scVal
+        .bytes()
+        .toJSON()
+        .data.map((d) => d.toString(16).padStart(2, "0"))
+        .join("");
+    }
+
+    case xdr.ScValType.scvContractInstance(): {
+      const instance = scVal.instance();
+      return instance.executable().wasmHash()?.toString();
+    }
+
+    case xdr.ScValType.scvError(): {
+      const error = scVal.error();
+      return error.value();
+    }
+
+    case xdr.ScValType.scvTimepoint():
+    case xdr.ScValType.scvDuration():
+    case xdr.ScValType.scvI128():
+    case xdr.ScValType.scvI256():
+    case xdr.ScValType.scvI32():
+    case xdr.ScValType.scvI64():
+    case xdr.ScValType.scvU128():
+    case xdr.ScValType.scvU256():
+    case xdr.ScValType.scvU32():
+    case xdr.ScValType.scvU64(): {
+      return scValToNative(scVal).toString();
+    }
+
+    case xdr.ScValType.scvLedgerKeyNonce():
+    case xdr.ScValType.scvLedgerKeyContractInstance(): {
+      if (scVal.switch().name === "scvLedgerKeyNonce") {
+        const val = scVal.nonceKey().nonce();
+        return val.toString();
+      }
+      return scVal.value();
+    }
+
+    case xdr.ScValType.scvVec():
+    case xdr.ScValType.scvMap(): {
+      return JSON.stringify(
+        scValToNative(scVal),
+        (_, val) => (typeof val === "bigint" ? val.toString() : val),
+        2,
+      );
+    }
+
+    case xdr.ScValType.scvString():
+    case xdr.ScValType.scvSymbol(): {
+      const native = scValToNative(scVal);
+      if (native.constructor === "Uint8Array") {
+        return native.toString();
+      }
+      return native;
+    }
+
+    case xdr.ScValType.scvVoid(): {
+      return null;
+    }
+
+    default:
+      return null;
+  }
+};
+
+export function getInvocationDetails(
+  invocation: xdr.SorobanAuthorizedInvocation,
+) {
+  const invocations = [] as InvocationArgs[];
+
+  walkInvocationTree(invocation, (inv) => {
+    const args = getInvocationArgs(inv);
+    if (args) {
+      invocations.push(args);
+    }
+
+    return null;
+  });
+
+  return invocations.filter(isInvocationArg);
+}
+
+export interface FnArgsInvoke {
+  type: "invoke";
+  fnName: string;
+  contractId: string;
+  args: xdr.ScVal[];
+}
+
+export interface FnArgsCreateWasm {
+  type: "wasm";
+  salt: string;
+  hash: string;
+  address: string;
+  args?: xdr.ScVal[];
+}
+
+export interface FnArgsCreateSac {
+  type: "sac";
+  asset: string;
+  args?: xdr.ScVal[];
+}
+
+export type InvocationArgs = FnArgsInvoke | FnArgsCreateWasm | FnArgsCreateSac;
+
+const isInvocationArg = (
+  invocation: InvocationArgs | undefined,
+): invocation is InvocationArgs => !!invocation;
+
+export function getInvocationArgs(
+  invocation: xdr.SorobanAuthorizedInvocation,
+): InvocationArgs | undefined {
+  const fn = invocation.function();
+
+  switch (fn.switch().value) {
+    // sorobanAuthorizedFunctionTypeContractFn
+    case 0: {
+      const _invocation = fn.contractFn();
+      const contractId = addressToString(_invocation.contractAddress());
+      const fnName = _invocation.functionName().toString();
+      const args = _invocation.args();
+      return { fnName, contractId, args, type: "invoke" };
+    }
+
+    // sorobanAuthorizedFunctionTypeCreateContractV2HostFn
+    // sorobanAuthorizedFunctionTypeCreateContractHostFn
+    case 2:
+    case 1: {
+      const _invocation =
+        fn.switch().value === 2
+          ? fn.createContractV2HostFn()
+          : fn.createContractHostFn();
+      const [exec, preimage] = [
+        _invocation.executable(),
+        _invocation.contractIdPreimage(),
+      ];
+
+      switch (exec.switch().value) {
+        // contractExecutableWasm
+        case 0: {
+          const details = preimage.fromAddress();
+
+          const contractDetails = {
+            type: "wasm",
+            salt: details.salt().toString("hex"),
+            hash: exec.wasmHash().toString("hex"),
+            address: Address.fromScAddress(details.address()).toString(),
+          } as FnArgsCreateWasm;
+
+          if (fn.switch().value === 2) {
+            contractDetails.args = (
+              _invocation as xdr.CreateContractArgsV2
+            ).constructorArgs();
+          }
+
+          return contractDetails;
+        }
+
+        // contractExecutableStellarAsset
+        case 1: {
+          const sacDetails = {
+            type: "sac",
+            asset: Asset.fromOperation(preimage.fromAsset()).toString(),
+          } as FnArgsCreateSac;
+
+          if (fn.switch().value === 2) {
+            sacDetails.args = (
+              _invocation as xdr.CreateContractArgsV2
+            ).constructorArgs();
+          }
+
+          return sacDetails;
+        }
+
+        default:
+          throw new Error(`unknown creation type: ${JSON.stringify(exec)}`);
+      }
+    }
+
+    default: {
+      return undefined;
+    }
+  }
+}
+
+export const getCreateContractArgs = (hostFn: xdr.HostFunction) => {
+  if (
+    hostFn.switch() !== xdr.HostFunctionType.hostFunctionTypeCreateContractV2()
+  ) {
+    const args = hostFn.createContract();
+    return {
+      contractIdPreimage: args.contractIdPreimage(),
+      executable: args.executable(),
+    };
+  }
+  const argsV2 = hostFn.createContractV2();
+  return {
+    contractIdPreimage: argsV2.contractIdPreimage(),
+    executable: argsV2.executable(),
+    constructorArgs: argsV2.constructorArgs(),
+  };
+};
+
+export const isSacContract = (
+  name: string,
+  contractId: string,
+  networkPassphrase: string,
+) => {
+  const Sdk = getSdk(networkPassphrase);
+  if (name.includes(":")) {
+    try {
+      return (
+        new Sdk.Asset(...(name.split(":") as [string, string])).contractId(
+          networkPassphrase,
+        ) === contractId
+      );
+    } catch (error) {
+      return false;
+    }
+  }
+
+  return false;
+};
+
+/**
+ * Determines if an asset is a Stellar Asset Contract (SAC).
+ * SAC assets include:
+ * 1. The native XLM contract
+ * 2. Classic Stellar assets that have been wrapped as Soroban contracts
+ *
+ * @param asset - Asset details
+ * @param networkDetails - Network configuration details
+ * @returns true if the asset is a SAC, false otherwise
+ */
+export const isAssetSac = ({
+  asset,
+  networkDetails,
+}: {
+  asset: {
+    code: string;
+    issuer: string | undefined;
+    contract: string | undefined;
+  };
+  networkDetails: NetworkDetails;
+}): boolean => {
+  if (!asset.contract) {
+    return false;
+  }
+
+  const nativeContract = getNativeContractDetails(networkDetails);
+
+  // Check if it's the native XLM contract
+  if (asset.contract === nativeContract.contract) {
+    return true;
+  }
+
+  // Check if it's a classic asset wrapper (SAC)
+  const canonicalName = getCanonicalFromAsset(asset.code, asset.issuer);
+  return isSacContract(
+    canonicalName,
+    asset.contract,
+    networkDetails.networkPassphrase,
+  );
+};

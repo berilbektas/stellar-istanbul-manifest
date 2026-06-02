@@ -1,0 +1,29 @@
+{
+  "name": "@wallet-mcp/twitter-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mock Twitter backend — the x402-gated resource server (the 'merchant'). Free reads, paid writes, settled via an x402 facilitator.",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@x402/core": "^2.3.0",
+    "@x402/express": "^2.3.0",
+    "@x402/stellar": "^2.3.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
+  }
+}

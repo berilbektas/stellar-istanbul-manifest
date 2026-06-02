@@ -1,0 +1,431 @@
+@use "../../styles/utils.scss" as *;
+
+.SignTransaction {
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+  padding: 1rem;
+  padding-top: 0;
+  background-color: var(--sds-clr-gray-01);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+
+  .multi-pane-slider__pane--active {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  .BlockaidDetailsExpanded {
+    padding-top: 1rem;
+  }
+
+  &__BlockaidDetails {
+    margin-bottom: pxToRem(-16px);
+  }
+
+  &__tabWrapper {
+    display: flex;
+    flex-direction: column;
+    gap: pxToRem(8px);
+    width: 100%;
+  }
+
+  &__TitleRow {
+    display: flex;
+    align-items: center;
+    margin-bottom: pxToRem(16px);
+
+    &__Detail {
+      display: flex;
+      flex-direction: column;
+      margin-left: pxToRem(12px);
+    }
+
+    &__Domain {
+      font-size: pxToRem(14px);
+      color: var(--sds-clr-gray-11);
+    }
+  }
+
+  &__Body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding-top: 2rem;
+    width: 100%;
+    flex: 1;
+    overflow-y: auto;
+
+    &__Wrapper {
+      max-width: 57rem;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+    }
+  }
+
+  .Blob {
+    display: -webkit-box;
+    width: 100%;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    word-wrap: break-word;
+  }
+
+  &__info {
+    margin-bottom: 2rem;
+  }
+
+  &__subject {
+    border-bottom: 1px solid var(--sds-clr-gray-03);
+    color: var(--sds-clr-gray-12);
+    font-size: 0.875rem;
+    line-height: 1.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 1rem;
+  }
+
+  &__approval {
+    margin-bottom: -1rem;
+
+    &__title {
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 0.875rem;
+      line-height: 1.5rem;
+    }
+  }
+
+  &__current-account {
+    align-items: flex-start;
+    display: flex;
+    justify-content: space-between;
+    margin: 1rem 0 0.5rem 0;
+    width: 100%;
+
+    &__chevron {
+      display: flex;
+      width: 0.75rem;
+    }
+  }
+
+  &__modal {
+    padding: 0.5rem 0 0.5rem 1.5rem;
+
+    .View__inset--scroll-shadows {
+      --bgRGB: 22, 22, 24;
+    }
+  }
+
+  &__account-not-found {
+    margin: 1rem 0;
+  }
+
+  &__Actions {
+    display: flex;
+    flex-direction: column;
+    align-self: flex-end;
+    align-items: center;
+    width: 100%;
+    position: sticky;
+    bottom: 0;
+    background-color: var(--sds-clr-gray-01);
+    box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
+    z-index: 10;
+
+    &__PublicKey {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: transparent;
+      cursor: pointer;
+      padding: 0.25rem 0.5rem;
+      border-radius: 7px;
+      border: 1px solid;
+      margin-top: 10px;
+      border-color: var(--sds-clr-gray-04);
+    }
+
+    &__BtnRow {
+      display: flex;
+      max-width: 57rem;
+      width: 100%;
+      margin-top: 10px;
+      gap: 0.5rem;
+    }
+
+    &__BtnRowReject {
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      margin-top: 10px;
+      gap: 0.5rem;
+
+      .SignTransaction__CancelBtn {
+        font-weight: 600;
+      }
+
+      .SignTransaction__Action__ConfirmAnyway {
+        border: 0;
+        color: var(--sds-clr-red-11);
+        background-color: transparent;
+        cursor: pointer;
+        margin-top: pxToRem(12px);
+        margin-bottom: pxToRem(12px);
+        padding-top: 0;
+
+        &:disabled {
+          color: var(--sds-clr-gray-09);
+          cursor: not-allowed;
+        }
+
+        &.Warning {
+          color: var(--sds-clr-gray-11);
+        }
+      }
+    }
+  }
+
+  &__AssetDiffs {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: pxToRem(12px) pxToRem(16px);
+    border-radius: pxToRem(16px);
+    background-color: var(--sds-clr-gray-03);
+
+    &:not(:first-child) {
+      margin-top: pxToRem(12px);
+    }
+  }
+
+  &__AssetDiffRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+
+    &:not(:last-child) {
+      margin-bottom: pxToRem(12px);
+      padding-bottom: pxToRem(12px);
+      border-bottom: 1px solid var(--sds-clr-gray-06);
+    }
+
+    &__Asset {
+      display: flex;
+      align-items: center;
+    }
+
+    &__Amount {
+      &.Credit {
+        color: var(--sds-clr-green-11);
+      }
+      &.Debit {
+        color: var(--sds-clr-red-11);
+      }
+    }
+  }
+
+  &__Metadata {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: pxToRem(12px) pxToRem(16px);
+    border-radius: pxToRem(16px);
+    background-color: var(--sds-clr-gray-03);
+    margin-top: pxToRem(12px);
+
+    &__Row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      width: 100%;
+
+      &:not(:last-child) {
+        margin-bottom: pxToRem(12px);
+        padding-bottom: pxToRem(12px);
+        border-bottom: 1px solid var(--sds-clr-gray-06);
+      }
+
+      &--memo {
+        gap: pxToRem(12px);
+
+        > * {
+          min-width: 0;
+        }
+
+        .SignTransaction__Metadata__Label {
+          flex: 0 0 auto;
+        }
+      }
+    }
+
+    &__Label {
+      display: flex;
+      align-items: center;
+      color: var(--sds-clr-gray-11);
+
+      svg {
+        margin-right: pxToRem(8px);
+      }
+    }
+
+    &__Memo {
+      // Truncation (overflow/ellipsis/nowrap) is owned by `.TruncatedMemo`;
+      // this selector only adds the layout-specific tweaks needed in this
+      // metadata row.
+      width: 100%;
+      text-align: right;
+    }
+
+    &__Value {
+      &--memo {
+        min-width: 0;
+        flex: 1 1 0;
+        max-width: 60%;
+        overflow: hidden;
+        text-align: right;
+      }
+
+      .CopyValue {
+        max-width: pxToRem(120px);
+
+        .Value {
+          max-width: pxToRem(100px);
+          text-overflow: ellipsis;
+          white-space: pre-wrap;
+          overflow: hidden;
+        }
+
+        svg {
+          color: var(--sds-clr-gray-09);
+        }
+      }
+    }
+  }
+
+  &__Trustlines {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: pxToRem(12px) pxToRem(16px);
+    border-radius: pxToRem(16px);
+    background-color: var(--sds-clr-gray-03);
+
+    &:not(:first-child) {
+      margin-top: pxToRem(12px);
+    }
+  }
+
+  &__TrustlineRow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+
+    &__Asset {
+      display: flex;
+      align-items: center;
+    }
+
+    &__Type {
+      display: flex;
+      color: var(--sds-clr-lilac-11);
+
+      svg {
+        margin-right: pxToRem(8px);
+      }
+    }
+  }
+
+  &__TransactionDetailsBtn {
+    display: flex;
+    padding: pxToRem(12px) pxToRem(16px);
+    border-radius: pxToRem(16px);
+    background-color: var(--sds-clr-gray-03);
+    margin-top: pxToRem(12px);
+    color: var(--sds-clr-lilac-11);
+    cursor: pointer;
+
+    svg {
+      margin-right: pxToRem(8px);
+    }
+  }
+
+  &__TransactionDetails {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    overflow-y: scroll;
+    max-width: 57rem;
+
+    &__Header {
+      display: flex;
+      justify-content: space-between;
+      margin: pxToRem(12px) 0;
+
+      .DetailsMark {
+        display: flex;
+        width: 40px;
+        height: 40px;
+        padding: 7.5px;
+        justify-content: center;
+        align-items: center;
+        aspect-ratio: 1/1;
+        border-radius: 8px;
+        border: 1px solid var(--sds-clr-lilac-06);
+        background: var(--sds-clr-lilac-03);
+
+        svg {
+          width: 25px;
+          height: 25px;
+          color: var(--sds-clr-lilac-09);
+        }
+      }
+
+      .Close {
+        display: flex;
+        width: 32px;
+        height: 32px;
+        justify-content: center;
+        align-items: center;
+        border-radius: 1000px;
+        background: var(--sds-clr-gray-03);
+        color: var(--sds-clr-gray-09);
+      }
+    }
+
+    &__Summary {
+      padding: pxToRem(12px) pxToRem(12px);
+      border-radius: pxToRem(16px);
+      background-color: var(--sds-clr-gray-03);
+      margin-top: pxToRem(12px);
+
+      > div:not(:first-child) {
+        margin-top: pxToRem(16px);
+        color: var(--sds-clr-gray-11);
+      }
+    }
+
+    &__Title {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      margin: pxToRem(12px) 0;
+      font-size: pxToRem(20px);
+    }
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

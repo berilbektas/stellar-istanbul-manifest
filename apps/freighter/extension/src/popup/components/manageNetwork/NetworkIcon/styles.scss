@@ -1,0 +1,34 @@
+@use "../../../styles/utils.scss" as *;
+
+.NetworkIcon {
+  border-radius: pxToRem(32px);
+  margin-right: pxToRem(8px);
+  height: pxToRem(16px);
+  width: pxToRem(16px);
+  display: flex;
+  align-items: center;
+
+  &--mainnet svg {
+    stroke: var(--sds-clr-lime-09);
+  }
+
+  &--testnet svg {
+    stroke: var(--sds-clr-pink-09);
+  }
+
+  &--custom1 svg {
+    stroke: var(--sds-clr-pink-09);
+  }
+
+  &--custom2 svg {
+    stroke: var(--sds-clr-green-09);
+  }
+
+  &--custom3 svg {
+    stroke: var(--sds-clr-teal-09);
+  }
+
+  &--custom4 svg {
+    stroke: var(--sds-clr-red-09);
+  }
+}

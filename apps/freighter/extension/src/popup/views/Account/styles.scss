@@ -1,0 +1,100 @@
+@use "../../styles/utils.scss" as *;
+
+:root {
+  --account-view-padding-side: 1.5rem;
+}
+
+.AccountView {
+  height: 100%;
+  &__account-details {
+    display: flex;
+    flex-direction: column;
+    max-width: 60%;
+  }
+
+  &__assets-wrapper {
+    .AccountAssets__asset {
+      margin: 2rem 0;
+    }
+  }
+
+  &__assets-button {
+    display: flex;
+    justify-content: center;
+    margin-top: 1.5rem;
+  }
+
+  @keyframes animateNotification {
+    from {
+      margin-top: 0;
+      height: 0;
+      overflow: hidden;
+    }
+    to {
+      margin-top: 1.5rem;
+      height: auto;
+      overflow: auto;
+    }
+  }
+
+  &__fullscreen {
+    margin-top: pxToRem(24) pxToRem(24) 0;
+  }
+
+  &__fetch-fail {
+    animation: animateNotification 0.3s ease-in-out;
+    margin-top: 1.5rem;
+  }
+
+  /* overwrite default MultiPaneSlider styles for AccountView
+    so that each pane takes full height and can scroll its content
+  */
+  .multi-pane-slider {
+    &__container {
+      height: 100%;
+
+      // this class is added when transitioning between panes;
+      // this allow us to make sure the container takes full viewport height and not the height of the previous pane
+      &--transitioning {
+        height: 100vh;
+      }
+    }
+
+    &__pane {
+      padding: 0 var(--account-view-padding-side);
+      height: auto;
+      overflow: auto;
+      position: relative;
+      width: 100%;
+
+      &:not(:first-child) {
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+    }
+  }
+
+  // Override View layout to remove scrollable areas
+  .View__contentAndFooterWrapper {
+    overflow: visible;
+  }
+
+  .View__content {
+    flex: none;
+    overflow: visible;
+  }
+
+  .View__content .View__inset {
+    flex: none;
+    overflow-y: visible;
+    padding-top: var(--View-inset-padding-top);
+    padding-bottom: 1.5rem;
+  }
+
+  &__discover-sheet {
+    background: var(--sds-clr-gray-01);
+    height: 100%;
+    width: 100%;
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "name": "@wallet-mcp/twitter-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Mock Twitter remote MCP server — agent-facing MCP (Streamable HTTP) exposing read_timeline + post_tweet, backed by twitter-backend.",
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "@x402/core": "^2.3.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
+  }
+}

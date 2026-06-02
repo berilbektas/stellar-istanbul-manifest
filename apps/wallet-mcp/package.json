@@ -1,0 +1,32 @@
+{
+  "name": "@wallet-mcp/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Wallet MCP — stdio MCP server on the agent host. Holds no private key; routes signing to the user's wallet via the transporter.",
+  "bin": {
+    "wallet-mcp": "./dist/index.js"
+  },
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome check .",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.25.2",
+    "@stellar/stellar-sdk": "^14.6.1",
+    "@x402/core": "^2.3.0",
+    "@x402/fetch": "^2.3.0",
+    "@x402/stellar": "^2.3.0",
+    "dotenv": "^16.4.7",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "tsx": "^4.19.2",
+    "typescript": "^5.9.3"
+  }
+}

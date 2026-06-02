@@ -1,0 +1,45 @@
+@use "../../../styles/utils.scss" as *;
+
+.ManageAssetsLists {
+  &__network {
+    position: absolute;
+    top: pxToRem(12);
+    left: pxToRem(30);
+  }
+
+  &__loader {
+    align-items: center;
+    display: flex;
+    height: 100%;
+    justify-content: center;
+  }
+
+  &__list {
+    background-color: var(--sds-clr-gray-02);
+    border-radius: pxToRem(16px);
+    padding: pxToRem(16px);
+    margin-top: 1.5rem;
+  }
+
+  &__badge {
+    display: flex;
+    margin-left: pxToRem(6px);
+  }
+
+  &__title {
+    font-size: pxToRem(16px);
+    line-height: pxToRem(24px);
+    margin-bottom: pxToRem(8px);
+  }
+
+  &__subtitle {
+    display: flex;
+    font-size: pxToRem(14px);
+    color: var(--sds-clr-gray-11);
+    line-height: pxToRem(20px);
+  }
+
+  &__select-wrapper {
+    margin-top: pxToRem(4px);
+  }
+}

@@ -1,0 +1,43 @@
+@use "../../styles/utils.scss" as *;
+
+.SignMessageData {
+  &:not(:first-child) {
+    margin-top: pxToRem(12px);
+  }
+
+  .Message {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+    min-height: pxToRem(200px);
+    padding: pxToRem(12px) pxToRem(16px);
+    border-radius: pxToRem(16px);
+    background-color: var(--sds-clr-gray-03);
+    color: var(--sds-clr-gray-11);
+
+    &__Content {
+      padding: pxToRem(16px) 0;
+      overflow: scroll;
+      flex-grow: 1;
+    }
+  }
+
+  .__json-pretty__ {
+    font-size: var(--sds-fs-secondary);
+    color: var(--sds-clr-gray-12);
+
+    .__json-key__ {
+      color: var(--sds-clr-gray-11);
+    }
+
+    .__json-string__,
+    .__json-number__,
+    .__json-boolean__ {
+      color: var(--sds-clr-gray-12);
+    }
+  }
+
+  .__json-pretty-error__ {
+    color: var(--sds-clr-gray-12);
+  }
+}

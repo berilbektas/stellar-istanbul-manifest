@@ -1,0 +1,35 @@
+@use "../../../styles/utils.scss" as *;
+
+.ConfirmMnemonicPhrase {
+  margin-top: #{pxToRem(146px)};
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+
+  &__card-wrapper {
+    margin-bottom: #{pxToRem(32px)};
+  }
+
+  &__word-bubble-wrapper {
+    display: flex;
+    flex-flow: column wrap;
+    align-content: start;
+    height: #{pxToRem(244px)};
+    gap: #{pxToRem(8px)};
+  }
+
+  &__footer {
+    color: var(--sds-clr-gray-11);
+    display: flex;
+    flex-direction: column;
+    font-size: #{pxToRem(14px)};
+    gap: #{pxToRem(16px)};
+    line-height: #{pxToRem(20px)};
+    text-align: center;
+
+    &__buttons {
+      display: flex;
+      gap: #{pxToRem(12px)};
+    }
+  }
+}

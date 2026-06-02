@@ -1,0 +1,28 @@
+@use "../../../styles/utils.scss" as *;
+
+.EditMemo {
+  z-index: var(--z-index--banner);
+  position: relative;
+
+  &__description {
+    font-size: 14px;
+    color: var(--sds-clr-gray-10);
+    margin: #{pxToRem(12px)} 0 #{pxToRem(18px)} 0;
+
+    &--warning {
+      color: var(--sds-clr-amber-11);
+      font-weight: var(--font-weight-medium);
+    }
+  }
+
+  &__actions {
+    display: flex;
+
+    button {
+      flex: 1;
+    }
+    button:not(:first-child) {
+      margin-left: #{pxToRem(10px)};
+    }
+  }
+}
