@@ -1,0 +1,84 @@
+@use "../../styles/utils.scss" as *;
+
+.TotpCode {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  margin-top: 1.25rem;
+
+  &__label {
+    font-size: 0.875rem;
+    line-height: 1.375rem;
+    color: rgba(255, 255, 255, 0.4);
+  }
+
+  &__row {
+    display: flex;
+    align-items: center;
+    gap: 0.875rem;
+    margin-top: 0.625rem;
+  }
+
+  &__digits {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: pxToRem(28px);
+    font-size: 1.75rem;
+    line-height: 1;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: pxToRem(3px);
+    // İlk "------" ile gerçek kod arası genişlik zıplamasını önle
+    min-width: pxToRem(150px);
+    text-align: center;
+    color: var(--sds-clr-gray-12);
+    cursor: pointer;
+    transition: opacity 0.15s ease;
+
+    &:hover {
+      opacity: 0.7;
+    }
+  }
+
+  &__copied {
+    // font boyutu/ağırlığı digits'ten miras; renk mor, letter-spacing kelimede sıfır
+    color: var(--sds-clr-lilac-09, var(--sds-clr-gray-09));
+    letter-spacing: normal;
+    animation: totp-copied-in 0.18s ease;
+  }
+
+  &__timer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: pxToRem(25px);
+    height: pxToRem(25px);
+  }
+
+  &__ring {
+    transform: rotate(-90deg);
+  }
+
+  &__ring-track {
+    stroke: var(--sds-clr-base-01);
+  }
+
+  &__ring-progress {
+    stroke: var(--sds-clr-lilac-09, var(--sds-clr-gray-09));
+    stroke-linecap: round;
+  }
+}
+
+@keyframes totp-copied-in {
+  from {
+    opacity: 0;
+    transform: translateY(pxToRem(2px));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
