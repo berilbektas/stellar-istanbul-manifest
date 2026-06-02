@@ -13,15 +13,19 @@ settling on Stellar testnet (USDC, fees sponsored by the facilitator).
 Each endpoint's x402 price equals what the X API charges for that operation
 (zero markup). Defined in `src/registry.ts` → `PRICES`:
 
-| Category            | Price    | Operations                                              |
-| ------------------- | -------- | ------------------------------------------------------- |
-| post read           | `$0.005` | search, get_tweet, timelines, followers/following       |
-| profile/owned read  | `$0.01`  | me, get_user, get_user_by_username, home, mentions      |
-| post create         | `$0.01`  | create_tweet, reply (no URL)                            |
-| post create + URL   | `$0.20`  | create_tweet/reply when the text contains a URL (**dynamic**) |
-| engagement write    | `$0.015` | like, retweet, follow, bookmark, delete, …              |
+| Category              | Price    | Operations                                              |
+| --------------------- | -------- | ------------------------------------------------------- |
+| post read             | `$0.005` | search, get_tweet, user/home/mentions timeline          |
+| user read             | `$0.01`  | get_user, get_user_by_username                          |
+| follows read          | `$0.01`  | followers, following                                    |
+| owned read            | `$0.001` | me                                                      |
+| post create           | `$0.015` | create_tweet, reply (no URL)                            |
+| post create + URL     | `$0.20`  | create_tweet/reply when the text contains a URL (**dynamic**) |
+| interaction create    | `$0.015` | like, retweet, follow                                   |
+| delete interaction    | `$0.01`  | unlike, unretweet, unfollow, delete_tweet               |
+| bookmark              | `$0.005` | bookmark, remove_bookmark                               |
 
-> Figures are representative (~2026); pin to X's live pay-per-use page before deploy.
+> Aligned with the official page: https://docs.x.com/x-api/getting-started/pricing
 > Dynamic pricing uses `@x402/core`'s `DynamicPrice` (reads the request body per request).
 
 ## Endpoints (21)

@@ -12,16 +12,20 @@ export interface TwitterCtx {
 }
 
 /**
- * X (Twitter) API pay-per-use fiyatları (~2026, temsilî).
+ * X (Twitter) API pay-per-use fiyatları — resmî sayfaya hizalı:
+ * https://docs.x.com/x-api/getting-started/pricing
  * Her x402 endpoint'i, ilgili X işleminin fiyatına eşittir (sıfır markup).
- * Rakamlar yıl içinde değişti → deploy öncesi X'in canlı pricing sayfasından TEYİT EDİLECEK.
  */
 export const PRICES = {
-  POST_READ: "$0.005", // post okuma: search, get_tweet, timeline'lar
-  PROFILE_READ: "$0.01", // profil/owned okuma: user lookup, me
-  POST_CREATE: "$0.01", // post oluşturma (URL yoksa)
-  POST_CREATE_WITH_URL: "$0.20", // URL içeren post (yüksek tier, dinamik)
-  ENGAGEMENT_WRITE: "$0.015", // like/retweet/follow/bookmark vb.
+  POST_READ: "$0.005", // post okuma: search, get_tweet, timeline'lar, mentions
+  PROFILE_READ: "$0.01", // kullanıcı okuma: get_user, get_user_by_username
+  FOLLOWS_READ: "$0.01", // followers / following okuma
+  OWNED_READ: "$0.001", // kendi verini okuma: me
+  POST_CREATE: "$0.015", // post oluşturma (URL yoksa)
+  POST_CREATE_WITH_URL: "$0.20", // URL içeren post (dinamik, yüksek tier)
+  ENGAGEMENT_WRITE: "$0.015", // interaction create: like, retweet, follow
+  DELETE_INTERACTION: "$0.01", // unlike, unretweet, unfollow, delete_tweet
+  BOOKMARK: "$0.005", // bookmark ekle / çıkar
 } as const;
 
 /** Metinde URL var mı? (post-create dinamik fiyatlandırması için) */
@@ -87,7 +91,7 @@ export const REGISTRY: ToolDef[] = [
     path: "/tweets/:id",
     pathParams: ["id"],
     input: z.object({ id: z.string() }),
-    price: PRICES.ENGAGEMENT_WRITE,
+    price: PRICES.DELETE_INTERACTION,
     call: (ctx, a) => ctx.v2.deleteTweet(a.id),
   }),
   def({
@@ -174,7 +178,7 @@ export const REGISTRY: ToolDef[] = [
     method: "GET",
     path: "/me",
     input: z.object({}),
-    price: PRICES.PROFILE_READ,
+    price: PRICES.OWNED_READ,
     call: (ctx) => ctx.v2.me(),
   }),
   // ---- Engagement: likes ----
@@ -194,7 +198,7 @@ export const REGISTRY: ToolDef[] = [
     path: "/likes/:tweet_id",
     pathParams: ["tweet_id"],
     input: z.object({ tweet_id: z.string() }),
-    price: PRICES.ENGAGEMENT_WRITE,
+    price: PRICES.DELETE_INTERACTION,
     call: async (ctx, a) => ctx.v2.unlike(await ctx.getMeId(), a.tweet_id),
   }),
   // ---- Engagement: retweets ----
@@ -214,7 +218,7 @@ export const REGISTRY: ToolDef[] = [
     path: "/retweets/:tweet_id",
     pathParams: ["tweet_id"],
     input: z.object({ tweet_id: z.string() }),
-    price: PRICES.ENGAGEMENT_WRITE,
+    price: PRICES.DELETE_INTERACTION,
     call: async (ctx, a) => ctx.v2.unretweet(await ctx.getMeId(), a.tweet_id),
   }),
   // ---- Reply ----
@@ -238,7 +242,7 @@ export const REGISTRY: ToolDef[] = [
     method: "POST",
     path: "/bookmarks",
     input: z.object({ tweet_id: z.string() }),
-    price: PRICES.ENGAGEMENT_WRITE,
+    price: PRICES.BOOKMARK,
     call: (ctx, a) => ctx.v2.bookmark(a.tweet_id),
   }),
   def({
@@ -248,7 +252,7 @@ export const REGISTRY: ToolDef[] = [
     path: "/bookmarks/:tweet_id",
     pathParams: ["tweet_id"],
     input: z.object({ tweet_id: z.string() }),
-    price: PRICES.ENGAGEMENT_WRITE,
+    price: PRICES.BOOKMARK,
     call: (ctx, a) => ctx.v2.deleteBookmark(a.tweet_id),
   }),
   // ---- Follows ----
@@ -269,7 +273,7 @@ export const REGISTRY: ToolDef[] = [
     path: "/following/:target_user_id",
     pathParams: ["target_user_id"],
     input: z.object({ target_user_id: z.string() }),
-    price: PRICES.ENGAGEMENT_WRITE,
+    price: PRICES.DELETE_INTERACTION,
     call: async (ctx, a) =>
       ctx.v2.unfollow(await ctx.getMeId(), a.target_user_id),
   }),
@@ -280,7 +284,7 @@ export const REGISTRY: ToolDef[] = [
     path: "/users/:id/followers",
     pathParams: ["id"],
     input: z.object({ id: z.string() }),
-    price: PRICES.POST_READ,
+    price: PRICES.FOLLOWS_READ,
     call: (ctx, a) => ctx.v2.followers(a.id),
   }),
   def({
@@ -290,7 +294,7 @@ export const REGISTRY: ToolDef[] = [
     path: "/users/:id/following",
     pathParams: ["id"],
     input: z.object({ id: z.string() }),
-    price: PRICES.POST_READ,
+    price: PRICES.FOLLOWS_READ,
     call: (ctx, a) => ctx.v2.following(a.id),
   }),
 ];
