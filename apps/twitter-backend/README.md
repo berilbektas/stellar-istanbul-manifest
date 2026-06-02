@@ -1,32 +1,75 @@
-# `@wallet-mcp/twitter-backend` — Mock Twitter backend (demo, part 1/2)
+# `@wallet-mcp/twitter-backend` — Twitter x402 backend (part 1/2)
 
 > Manifest Component 4 (§5, §12), **split part 1**: the x402-gated **resource
 > server** ("the merchant"). Plain HTTP, no MCP. Paired with
 > [`twitter-mcp`](../twitter-mcp) (the remote MCP server, part 2/2).
 
-## Routes
+Wraps the **real Twitter API v2** (`twitter-api-v2`, OAuth 1.0a user-context).
+**Every** endpoint is x402-gated — nothing returns without an on-chain payment
+settling on Stellar testnet (USDC, fees sponsored by the facilitator).
 
-| Route          | Price | Behavior                                                            |
-| -------------- | ----- | ------------------------------------------------------------------ |
-| `GET /timeline`| free  | Returns mock timeline data.                                        |
-| `POST /tweet`  | paid  | `402` + `PAYMENT-REQUIRED`; after the facilitator settles, returns a mock "tweet posted" + `PAYMENT-RESPONSE`. |
+## Pricing — per-operation (X pay-per-use, not flat)
 
-Built with **Express + `@x402/express`** (`paymentMiddlewareFromConfig`,
-`HTTPFacilitatorClient`). The actual payer is the user's wallet, via the Wallet
-MCP's `pay_x402` (the remote signer flow, manifest §4/§8).
+Each endpoint's x402 price equals what the X API charges for that operation
+(zero markup). Defined in `src/registry.ts` → `PRICES`:
 
-## Why split from the MCP?
+| Category            | Price    | Operations                                              |
+| ------------------- | -------- | ------------------------------------------------------- |
+| post read           | `$0.005` | search, get_tweet, timelines, followers/following       |
+| profile/owned read  | `$0.01`  | me, get_user, get_user_by_username, home, mentions      |
+| post create         | `$0.01`  | create_tweet, reply (no URL)                            |
+| post create + URL   | `$0.20`  | create_tweet/reply when the text contains a URL (**dynamic**) |
+| engagement write    | `$0.015` | like, retweet, follow, bookmark, delete, …              |
 
-Deploying is simpler when the merchant API and the agent-facing MCP are separate
-services: the backend is a stateless HTTP service you can host anywhere, and the
-remote MCP server ([`twitter-mcp`](../twitter-mcp)) talks to it over HTTP. No
-shared workspace packages — each app is self-contained.
+> Figures are representative (~2026); pin to X's live pay-per-use page before deploy.
+> Dynamic pricing uses `@x402/core`'s `DynamicPrice` (reads the request body per request).
+
+## Endpoints (21)
+
+Generated from the single `REGISTRY` in `src/registry.ts` (one source of truth
+for routes + x402 price + the `twitter-api-v2` call). Examples:
+`POST /tweets`, `GET /tweets/:id`, `DELETE /tweets/:id`, `GET /search`,
+`GET /home`, `GET /mentions`, `GET /me`, `POST /likes`, `POST /retweets`,
+`POST /following`, `GET /users/:id/timeline`, … plus `GET /healthz` (ungated).
+
+Built with **Express + `@x402/express`** (`paymentMiddlewareFromConfig` +
+`HTTPFacilitatorClient` + `ExactStellarScheme`). The actual payer is the user's
+wallet, via the Wallet MCP's `pay_x402` (remote signer flow, manifest §4/§8).
 
 ## Config
 
-See `.env.example` (port, network, facilitator, pay-to, price). Prereqs:
-testnet, **USDC trustline**, fee fixed to 1 stroop (manifest §12, §15).
+See `.env.example`: `PORT`, `STELLAR_NETWORK`, `FACILITATOR_URL`, `PAY_TO`
+(seller G-address, USDC trustline open), and `TWITTER_*` (OAuth 1.0a keys).
+There is **no global price** — pricing is per-operation in the registry.
+
+> Twitter init is lazy: the server boots without valid Twitter creds and still
+> serves `402`s (the gate runs before any Twitter call), so the x402 layer can be
+> demoed independently. `me()` is fetched+cached on first engagement call.
+
+### x402 bypass (dev/test only)
+
+Set `X402_BYPASS=true` in `.env` to **skip payment entirely** — the x402
+middleware is not mounted, so every endpoint runs free (no `402`). `PAY_TO` is
+not required in this mode. `GET /healthz` reports `{ "x402Bypass": true }`.
+**Never enable in production.** With bypass on + real Twitter creds, tools return
+data directly; the MCP relays that as `{ "status": "ok", "result": … }`.
+
+## Run
+
+```bash
+bun run dev    # tsx watch, :4021
+bun run typecheck
+bun run lint   # biome
+```
+
+Gate check (no Twitter creds needed):
+
+```bash
+curl -i http://localhost:4021/me                       # 402 + PAYMENT-REQUIRED (amount 100000 = $0.01)
+curl -i -X POST http://localhost:4021/tweets -H 'content-type: application/json' -d '{"text":"hi https://x.com"}'
+#                                                       # dynamic → amount 2000000 = $0.20
+```
 
 ## Entry point
 
-`src/index.ts` (scaffold).
+`src/index.ts` → `src/{env,twitter,routes,registry}.ts`.

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Mock Twitter remote MCP server — agent-facing MCP (Streamable HTTP) exposing read_timeline + post_tweet, backed by twitter-backend.",
+  "description": "Twitter remote MCP server — keyless, agent-facing MCP (Streamable HTTP) exposing all 21 Twitter operations as tools, backed by twitter-backend. Relays each backend 402 PAYMENT-REQUIRED so the agent pays via wallet-mcp's pay_x402.",
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/index.ts",
     "build": "bun build ./src/index.ts --outdir ./dist --target node",
@@ -14,7 +14,6 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.25.2",
-    "@x402/core": "^2.3.0",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
     "zod": "^4.3.6"
