@@ -20,6 +20,7 @@ import { truncatedPublicKey } from "helpers/stellar";
 import { METRIC_NAMES } from "popup/constants/metricsNames";
 import { openTab } from "popup/helpers/navigate";
 import { View } from "popup/basics/layout/View";
+import { TotpCode } from "popup/components/TotpCode";
 import {
   accountNameSelector,
   updateAccountName,
@@ -195,6 +196,7 @@ export const ViewPublicKey = () => {
               </Button>
             </CopyText>
           </div>
+          <TotpCode />
         </div>
       </View.Content>
       <View.Footer>
