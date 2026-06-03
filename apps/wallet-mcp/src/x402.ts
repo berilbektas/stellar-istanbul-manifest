@@ -129,12 +129,20 @@ export async function payX402(opts: {
   );
   const http = new x402HTTPClient(client);
 
+  // Attach a JSON body only for methods that allow one and when there's an
+  // actual payload. twitter-mcp surfaces `body: null` for GET and param-only
+  // DELETE endpoints, and fetch throws if a GET/HEAD request carries a body.
   const headers: Record<string, string> = {};
-  let init: RequestInit = { method };
-  if (body !== undefined) {
-    headers["content-type"] = "application/json";
-    init = { method, headers, body: JSON.stringify(body) };
-  }
+  const hasBody =
+    body !== undefined &&
+    body !== null &&
+    method !== "GET" &&
+    method !== "HEAD";
+  if (hasBody) headers["content-type"] = "application/json";
+  const init: RequestInit = {
+    method,
+    ...(hasBody ? { headers, body: JSON.stringify(body) } : {}),
+  };
 
   const first = await fetch(url, init);
   if (first.status !== 402) {

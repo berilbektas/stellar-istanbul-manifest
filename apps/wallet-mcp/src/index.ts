@@ -169,7 +169,7 @@ server.registerTool(
       const signer = signerFor(creds, metaRef);
       const result = await payX402({
         url,
-        method: method ?? (body !== undefined ? "POST" : "GET"),
+        method: method ?? (body != null ? "POST" : "GET"),
         body,
         signer,
         metaRef,
