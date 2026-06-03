@@ -25,11 +25,19 @@ To keep deploys simple, this app vendors everything it needs in `src/`:
 
 ```
 src/
-  index.ts             # MCP server (stdio) + tool registration
-  remote-signer.ts     # the signer swap (manifest §4) — preimage -> transporter -> Freighter
+  index.ts             # MCP server (stdio) + the four tools
+  config.ts            # env: TRANSPORTER_URL, network, Soroban RPC, poll/fee knobs
+  creds.ts             # ~/.wallet-mcp/creds.json (0600) — pairing JWT, no key
   transporter-client.ts# HTTP client: /pair, /sign-request, poll GET /sign-request/:id
+  remote-signer.ts     # the signer swap (manifest §4) — SEP-43 signer, payload -> transporter -> Freighter
+  x402.ts              # pay_x402 flow (manual client.js flow + guarded testnet fee fix)
   types.ts             # local copy of the transporter API contract (source of truth: docs/api-transporter.md)
 ```
+
+The remote signer implements the **SEP-43** `ClientStellarSigner`
+(`{ address, signAuthEntry, signTransaction }`) that `@x402/stellar` expects —
+the same shape `createEd25519Signer` returns, but holding no key. It's a pure
+string pass-through: the MCP never parses XDR (resolves manifest §16).
 
 ## Secrets
 
@@ -38,10 +46,11 @@ src/
 - MCP config carries only `TRANSPORTER_URL`. See `.env.example`.
 - **No private key, ever.**
 
-## Entry point
+## Run
 
-`src/index.ts` (scaffold). Implement the MCP server with
-`@modelcontextprotocol/sdk` (stdio transport) and the four tools above.
+`bun run dev` (tsx watch) or `bun run build && bun run start`. Point a host at
+it over stdio — see [`examples/claude-desktop`](../../examples/claude-desktop).
+Pair once with `setup_wallet`, then `pay_x402` / `sign_transaction`.
 
 ## Related
 
