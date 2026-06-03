@@ -20,12 +20,11 @@ import { truncatedPublicKey } from "helpers/stellar";
 import { METRIC_NAMES } from "popup/constants/metricsNames";
 import { openTab } from "popup/helpers/navigate";
 import { View } from "popup/basics/layout/View";
+import { TotpCode } from "popup/components/TotpCode";
 import {
   accountNameSelector,
   updateAccountName,
 } from "popup/ducks/accountServices";
-
-import { TotpCode } from "popup/components/TotpCode";
 
 import "./styles.scss";
 import { AppDispatch } from "popup/App";
@@ -197,7 +196,7 @@ export const ViewPublicKey = () => {
               </Button>
             </CopyText>
           </div>
-          <TotpCode publicKey={publicKey} />
+          <TotpCode />
         </div>
       </View.Content>
       <View.Footer>

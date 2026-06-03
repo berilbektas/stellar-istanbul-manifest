@@ -1,38 +1,64 @@
-import React, { useEffect, useState } from "react";
-import { CopyText } from "@stellar/design-system";
+import React, { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { useSelector } from "react-redux";
 
 import { getRegistration } from "background/transporter/storage";
-import { totpCode, totpSecondsRemaining } from "background/transporter/totp";
+import { publicKeySelector } from "popup/ducks/accountServices";
+import { base32ToBytes, secondsRemaining, totp } from "popup/helpers/totp";
 
 import "./styles.scss";
 
-/**
- * Wallet MCP pairing code (manifest §7 Flow A.4).
- *
- * Shows the rotating 6-digit TOTP code for the active account, derived from the
- * `totpSecret` the transporter bridge stored at registration. The user reads it
- * and types it into the agent's `setup_wallet`. Renders nothing until the
- * account has been registered with a transporter.
- */
+const STEP = 30;
+
+// SVG halka geometrisi — rakamların görsel yüksekliğiyle eşleşecek şekilde
+const RING_SIZE = 25;
+const RING_STROKE = 2.5;
+const RING_RADIUS = (RING_SIZE - RING_STROKE) / 2;
+const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
 interface TotpCodeProps {
-  publicKey: string;
+  /**
+   * Override the secret (raw bytes). When omitted, the active account's
+   * transporter pairing secret (set by the bridge at /register) is used —
+   * manifest §7 Flow A.4. Renders nothing until that secret exists.
+   */
+  secret?: Uint8Array;
+  step?: number;
 }
 
-export const TotpCode = ({ publicKey }: TotpCodeProps) => {
+export const TotpCode = ({ secret, step = STEP }: TotpCodeProps) => {
   const { t } = useTranslation();
-  const [secret, setSecret] = useState<string | null>(null);
+  const activePublicKey = useSelector(publicKeySelector);
+  const [fetchedSecret, setFetchedSecret] = useState<Uint8Array | undefined>(
+    undefined,
+  );
   const [code, setCode] = useState("------");
-  const [remaining, setRemaining] = useState(30);
+  const [remaining, setRemaining] = useState(step);
+  const [copied, setCopied] = useState(false);
+  const counterRef = useRef(-1);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
+  // Pencere resetlenirken halkanın geriye doğru süpürmesini engelle.
+  const [animate, setAnimate] = useState(true);
 
-  // Load (and keep polling for) this account's transporter registration. The
-  // bridge registers on boot, which may land shortly after this view mounts.
+  // Load the real pairing secret for the active account from the transporter
+  // registration (base32 → bytes). Poll: it may land shortly after mount.
   useEffect(() => {
+    if (secret) {
+      return undefined;
+    }
     let active = true;
     const load = async () => {
-      const registration = await getRegistration(publicKey);
+      const registration = activePublicKey
+        ? await getRegistration(activePublicKey)
+        : undefined;
       if (active) {
-        setSecret(registration?.totpSecret ?? null);
+        setFetchedSecret(
+          registration?.totpSecret
+            ? base32ToBytes(registration.totpSecret)
+            : undefined,
+        );
       }
     };
     load();
@@ -41,48 +67,120 @@ export const TotpCode = ({ publicKey }: TotpCodeProps) => {
       active = false;
       clearInterval(id);
     };
-  }, [publicKey]);
+  }, [secret, activePublicKey]);
 
-  // Tick the code + countdown once a second.
+  const effectiveSecret = secret ?? fetchedSecret;
+
+  const handleCopy = async () => {
+    if (code.includes("-")) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+      // clipboard erişimi yoksa sessizce geç
+    }
+    setCopied(true);
+    clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(false), 1500);
+  };
+
+  useEffect(() => () => clearTimeout(copiedTimer.current), []);
+
   useEffect(() => {
-    if (!secret) {
+    if (!effectiveSecret) {
       return undefined;
     }
     let active = true;
+    counterRef.current = -1;
+
     const tick = async () => {
-      const next = await totpCode(secret);
-      if (active) {
-        setCode(next);
-        setRemaining(totpSecondsRemaining());
+      const now = Date.now();
+      const nextRemaining = secondsRemaining(step, now);
+
+      setRemaining((prev) => {
+        // remaining arttıysa yeni pencere başladı → bu kareye geçiş animasyonu uygulama
+        setAnimate(nextRemaining <= prev);
+        return nextRemaining;
+      });
+
+      // Kodu yalnızca 30sn'lik pencere değişince yeniden hesapla
+      const c = Math.floor(now / 1000 / step);
+      if (c !== counterRef.current) {
+        const next = await totp(effectiveSecret, { step, now });
+        if (active) {
+          setCode(next);
+          counterRef.current = c;
+        }
       }
     };
+
     tick();
     const id = setInterval(tick, 1000);
     return () => {
       active = false;
       clearInterval(id);
     };
-  }, [secret]);
+  }, [effectiveSecret, step]);
 
-  if (!secret) {
+  const dashOffset = RING_CIRCUMFERENCE * (1 - remaining / step);
+
+  // Not paired with a transporter yet → nothing to show.
+  if (!effectiveSecret) {
     return null;
   }
 
   return (
-    <div className="TotpCode" data-testid="totp-code">
-      <div className="TotpCode__label">{t("Wallet MCP pairing code")}</div>
-      <div className="TotpCode__code-row">
-        <CopyText textToCopy={code} doneLabel={t("Copied!")}>
-          <span className="TotpCode__code" data-testid="totp-code-value">
-            {code}
-          </span>
-        </CopyText>
-        <span className="TotpCode__countdown">{remaining}s</span>
-      </div>
-      <div className="TotpCode__hint">
-        {t(
-          "Enter this in the agent's setup_wallet to pair. Rotates every 30s.",
-        )}
+    <div className="TotpCode">
+      <div className="TotpCode__label">{t("Pairing code")}</div>
+      <div className="TotpCode__row">
+        <div
+          className="TotpCode__digits"
+          title={t("Copy")}
+          onClick={handleCopy}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              handleCopy();
+            }
+          }}
+        >
+          {copied ? (
+            <span className="TotpCode__copied" key="copied">
+              {t("Copied!")}
+            </span>
+          ) : (
+            <span key="code">
+              {code.slice(0, 3)} {code.slice(3)}
+            </span>
+          )}
+        </div>
+        <div className="TotpCode__timer">
+          <svg width={RING_SIZE} height={RING_SIZE} className="TotpCode__ring">
+            <circle
+              className="TotpCode__ring-track"
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RING_RADIUS}
+              strokeWidth={RING_STROKE}
+              fill="none"
+            />
+            <circle
+              className="TotpCode__ring-progress"
+              cx={RING_SIZE / 2}
+              cy={RING_SIZE / 2}
+              r={RING_RADIUS}
+              strokeWidth={RING_STROKE}
+              fill="none"
+              strokeDasharray={RING_CIRCUMFERENCE}
+              strokeDashoffset={dashOffset}
+              style={{
+                transition: animate ? "stroke-dashoffset 1s linear" : "none",
+              }}
+            />
+          </svg>
+        </div>
       </div>
     </div>
   );
