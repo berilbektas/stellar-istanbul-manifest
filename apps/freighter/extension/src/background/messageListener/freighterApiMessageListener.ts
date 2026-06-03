@@ -87,7 +87,7 @@ const makeSafeResolve = (resolve: (value: unknown) => void) => {
   };
 };
 
-const openSigningWindow = async (
+export const openSigningWindow = async (
   hashRoute: string,
   uuid: string,
   width?: number,

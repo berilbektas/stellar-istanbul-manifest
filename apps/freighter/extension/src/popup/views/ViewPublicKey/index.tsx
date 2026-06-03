@@ -25,6 +25,8 @@ import {
   updateAccountName,
 } from "popup/ducks/accountServices";
 
+import { TotpCode } from "popup/components/TotpCode";
+
 import "./styles.scss";
 import { AppDispatch } from "popup/App";
 import { AppDataType, useGetAppData } from "helpers/hooks/useGetAppData";
@@ -195,6 +197,7 @@ export const ViewPublicKey = () => {
               </Button>
             </CopyText>
           </div>
+          <TotpCode publicKey={publicKey} />
         </div>
       </View.Content>
       <View.Footer>

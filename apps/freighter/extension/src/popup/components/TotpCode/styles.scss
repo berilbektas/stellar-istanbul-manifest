@@ -1,0 +1,40 @@
+.TotpCode {
+  width: 100%;
+  margin-top: 1.5rem;
+  text-align: center;
+
+  &__label {
+    margin-bottom: 0.5rem;
+    font-size: 0.75rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--sds-clr-gray-09, #6c6f7e);
+  }
+
+  &__code-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75rem;
+  }
+
+  &__code {
+    font-family: "SFMono-Regular", "SF Mono", Menlo, monospace;
+    font-size: 2rem;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    cursor: pointer;
+  }
+
+  &__countdown {
+    min-width: 2.5rem;
+    font-size: 0.875rem;
+    color: var(--sds-clr-gray-09, #6c6f7e);
+  }
+
+  &__hint {
+    margin-top: 0.5rem;
+    font-size: 0.75rem;
+    color: var(--sds-clr-gray-09, #6c6f7e);
+  }
+}

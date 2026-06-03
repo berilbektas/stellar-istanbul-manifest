@@ -43,7 +43,12 @@
   "permissions": [
     "storage",
     "alarms",
-    "sidePanel"
+    "sidePanel",
+    "notifications"
+  ],
+  "host_permissions": [
+    "http://localhost:8787/*",
+    "https://*/*"
   ],
   "side_panel": {
     "default_path": "index.html?mode=sidebar"

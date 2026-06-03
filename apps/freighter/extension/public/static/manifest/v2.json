@@ -35,7 +35,13 @@
     "48": "images/icon48.png",
     "128": "images/icon128.png"
   },
-  "permissions": ["storage", "alarms"],
+  "permissions": [
+    "storage",
+    "alarms",
+    "notifications",
+    "http://localhost:8787/*",
+    "https://*/*"
+  ],
   "sidebar_action": {
     "default_panel": "index.html?mode=sidebar",
     "default_icon": {

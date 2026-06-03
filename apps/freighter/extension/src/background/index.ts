@@ -53,6 +53,12 @@ import {
 } from "@stellar/typescript-wallet-sdk-km";
 import { BrowserStorageConfigParams } from "@stellar/typescript-wallet-sdk-km/lib/Plugins/BrowserStorageFacade";
 
+// Transporter integration (manifest Component 3 — Wallet MCP relay).
+export {
+  initTransporterBridge,
+  initTransporterPush,
+} from "./transporter/bridge";
+
 const sessionTimer = new SessionTimer();
 
 export const initContentScriptMessageListener = () => {
