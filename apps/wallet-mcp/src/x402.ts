@@ -139,9 +139,14 @@ export async function payX402(opts: {
     method !== "GET" &&
     method !== "HEAD";
   if (hasBody) headers["content-type"] = "application/json";
+  // The agent may hand us `body` as an object OR as an already-serialized JSON
+  // string (LLMs commonly stringify nested tool args). Don't double-encode a
+  // string — that would send `"{\"text\":...}"` and the server's express.json()
+  // would 400 on the first request, before the 402/payment ever happens.
+  const serializedBody = typeof body === "string" ? body : JSON.stringify(body);
   const init: RequestInit = {
     method,
-    ...(hasBody ? { headers, body: JSON.stringify(body) } : {}),
+    ...(hasBody ? { headers, body: serializedBody } : {}),
   };
 
   const first = await fetch(url, init);
